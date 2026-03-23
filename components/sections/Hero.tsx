@@ -24,7 +24,7 @@ const slides: Slide[] = [
     description: 'Soluções completas em energia solar para residências, empresas e projetos industriais de grande porte',
     image: '/images/hero1.jpg',
     cta: 'Conferir Ofertas',
-    link: '/products',
+    link: '/produtos',
     badge: '✨ Novidade Solar'
   },
   {
@@ -34,7 +34,7 @@ const slides: Slide[] = [
     description: 'Aproveite condições especiais com até 40% de desconto em produtos selecionados',
     image: '/images/hero2.jpg',
     cta: 'Aproveitar Ofertas',
-    link: '/offers',
+    link: '/produtos',
     badge: '⚡ Oferta Relâmpago'
   },
   {
@@ -44,7 +44,7 @@ const slides: Slide[] = [
     description: 'Descubra nossa linha premium de painéis solares monocristalinos com eficiência superior e garantia estendida',
     image: '/images/hero3.jpg',
     cta: 'Ver Produtos',
-    link: '/products/solar-panels',
+    link: '/produtos',
     badge: '🌟 Linha Premium'
   },
   {
@@ -54,7 +54,7 @@ const slides: Slide[] = [
     description: 'Sistemas de armazenamento LiFePO4 para residências e empresas, garantindo energia limpa 24/7',
     image: '/images/hero4.jpg',
     cta: 'Conhecer Soluções',
-    link: '/products/solar-batteries',
+    link: '/produtos',
     badge: '🔋 Tecnologia Avançada'
   },
   {
@@ -64,7 +64,7 @@ const slides: Slide[] = [
     description: 'Kits prontos para instalação com painéis, inversores e controladores de carga de última geração',
     image: '/images/hero5.jpg',
     cta: 'Ver Kits',
-    link: '/products/solar-kits',
+    link: '/produtos',
     badge: '🏠 Recomendado'
   },
   {
@@ -74,7 +74,7 @@ const slides: Slide[] = [
     description: 'Equipe certificada para instalação de sistemas solares com qualidade e segurança garantidas',
     image: '/images/hero6.jpg',
     cta: 'Agendar Visita',
-    link: '/services/installation',
+    link: '/produtos',
     badge: '👨‍🔧 Profissional'
   },
 ]
