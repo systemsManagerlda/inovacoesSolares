@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 
-import { useState, useEffect, useMemo, Suspense } from 'react'
+import { useState, useEffect, useMemo, Suspense, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useSearchParams } from 'next/navigation'
@@ -26,7 +26,10 @@ import {
   Heart,
   Scale,
   Boxes,
-  Factory} from 'lucide-react'
+  Factory,
+  RefreshCw,
+  WifiOff
+} from 'lucide-react'
 import ProductCard from '@/components/products/ProductCard'
 import { WooProduct } from '@/types'
 
@@ -198,10 +201,16 @@ function ProductsContent() {
   const [products, setProducts] = useState<WooProduct[]>([])
   const [filteredProducts, setFilteredProducts] = useState<WooProduct[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [sortBy, setSortBy] = useState('relevance')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [autoRefresh, setAutoRefresh] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  
   const [filters, setFilters] = useState<FilterState>({
     category: searchParams.get('categoria') || 'all',
     subcategory: '',
@@ -223,84 +232,126 @@ function ProductsContent() {
 
   const itemsPerPage = 12
 
-  // Simular busca de produtos
-  useEffect(() => {
-    const fetchProducts = async () => {
-      setLoading(true)
-      try {
-        const params = new URLSearchParams()
-        if (filters.category !== 'all') params.append('category', filters.category)
-        if (filters.search) params.append('search', filters.search)
-        if (filters.minPrice) params.append('min_price', filters.minPrice.toString())
-        if (filters.maxPrice) params.append('max_price', filters.maxPrice.toString())
-        if (filters.inStock) params.append('stock_status', 'instock')
-        if (filters.onSale) params.append('on_sale', 'true')
-        
-        switch (sortBy) {
-          case 'date_desc': params.append('orderby', 'date'); params.append('order', 'desc'); break
-          case 'date_asc': params.append('orderby', 'date'); params.append('order', 'asc'); break
-          case 'price_asc': params.append('orderby', 'price'); params.append('order', 'asc'); break
-          case 'price_desc': params.append('orderby', 'price'); params.append('order', 'desc'); break
-          case 'rating_desc': params.append('orderby', 'rating'); params.append('order', 'desc'); break
-          default: params.append('orderby', 'date'); params.append('order', 'desc')
-        }
-        
-        params.append('per_page', '100')
-        
-        const response = await fetch(`/api/woocommerce?endpoint=products&${params}`)
-        const data = await response.json()
-        
-        let filtered = [...data]
-        
-        // Aplicar filtros locais
-        if (filters.brands.length > 0) {
-          filtered = filtered.filter(p => {
-            const productBrand = p.brand || brands[Math.floor(Math.random() * brands.length)].name
-            return filters.brands.includes(productBrand)
-          })
-        }
-        
-        if (filters.rating) {
-          filtered = filtered.filter(p => parseFloat(p.average_rating) >= filters.rating!)
-        }
-        
-        if (filters.powerRating.length > 0) {
-          // Simulação de filtro por potência
-        }
-        
-        if (filters.efficiency.length > 0) {
-          // Simulação de filtro por eficiência
-        }
-        
-        if (filters.warranty.length > 0) {
-          // Simulação de filtro por garantia
-        }
-        
-        if (filters.certification.length > 0) {
-          // Simulação de filtro por certificação
-        }
-        
-        if (filters.application.length > 0) {
-          // Simulação de filtro por aplicação
-        }
-        
-        setProducts(filtered)
-        setTotalPages(Math.ceil(filtered.length / itemsPerPage))
-        setFilteredProducts(filtered)
-      } catch (error) {
-        console.error('Erro ao buscar produtos:', error)
-      } finally {
-        setLoading(false)
+  // Função para buscar produtos com timestamp e sem cache
+  const fetchProducts = useCallback(async (showRefreshing = false) => {
+    if (showRefreshing) setRefreshing(true)
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const params = new URLSearchParams()
+      if (filters.category !== 'all') params.append('category', filters.category)
+      if (filters.search) params.append('search', filters.search)
+      if (filters.minPrice) params.append('min_price', filters.minPrice.toString())
+      if (filters.maxPrice) params.append('max_price', filters.maxPrice.toString())
+      if (filters.inStock) params.append('stock_status', 'instock')
+      if (filters.onSale) params.append('on_sale', 'true')
+      
+      switch (sortBy) {
+        case 'date_desc': params.append('orderby', 'date'); params.append('order', 'desc'); break
+        case 'date_asc': params.append('orderby', 'date'); params.append('order', 'asc'); break
+        case 'price_asc': params.append('orderby', 'price'); params.append('order', 'desc'); break
+        case 'price_desc': params.append('orderby', 'price'); params.append('order', 'desc'); break
+        case 'rating_desc': params.append('orderby', 'rating'); params.append('order', 'desc'); break
+        default: params.append('orderby', 'date'); params.append('order', 'desc')
       }
+      
+      params.append('per_page', '100')
+      // Adicionar timestamp para evitar cache
+      params.append('_t', Date.now().toString())
+      
+      // Adicionar header para evitar cache
+      const response = await fetch(`/api/woocommerce?endpoint=products&${params}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Erro ${response.status}: ${response.statusText}`)
+      }
+      
+      const data = await response.json()
+      
+      let filtered = [...data]
+      
+      // Aplicar filtros locais
+      if (filters.brands.length > 0) {
+        filtered = filtered.filter(p => {
+          const productBrand = p.brand || brands[Math.floor(Math.random() * brands.length)].name
+          return filters.brands.includes(productBrand)
+        })
+      }
+      
+      if (filters.rating) {
+        filtered = filtered.filter(p => parseFloat(p.average_rating) >= filters.rating!)
+      }
+      
+      if (filters.powerRating.length > 0) {
+        // Simulação de filtro por potência
+      }
+      
+      if (filters.efficiency.length > 0) {
+        // Simulação de filtro por eficiência
+      }
+      
+      if (filters.warranty.length > 0) {
+        // Simulação de filtro por garantia
+      }
+      
+      if (filters.certification.length > 0) {
+        // Simulação de filtro por certificação
+      }
+      
+      if (filters.application.length > 0) {
+        // Simulação de filtro por aplicação
+      }
+      
+      setProducts(filtered)
+      setTotalPages(Math.ceil(filtered.length / itemsPerPage))
+      setFilteredProducts(filtered)
+      setLastUpdate(new Date())
+    } catch (error) {
+      console.error('Erro ao buscar produtos:', error)
+      setError(error instanceof Error ? error.message : 'Erro ao carregar produtos')
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }, [filters, sortBy, itemsPerPage])
+
+  // Configurar refresh automático
+  useEffect(() => {
+    // Buscar produtos inicialmente
+    fetchProducts()
+    
+    // Configurar intervalo de refresh automático
+    if (autoRefresh) {
+      refreshIntervalRef.current = setInterval(() => {
+        fetchProducts(true)
+      }, 10000) // Atualizar a cada 10 segundos
     }
     
+    // Cleanup
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current)
+      }
+    }
+  }, [fetchProducts, autoRefresh])
+
+  // Buscar quando os filtros mudarem
+  useEffect(() => {
     fetchProducts()
-  }, [filters, sortBy])
+  }, [fetchProducts])
 
   const paginatedProducts = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage
     return filteredProducts.slice(start, start + itemsPerPage)
-  }, [filteredProducts, currentPage])
+  }, [filteredProducts, currentPage, itemsPerPage])
 
   const handleFilterChange = (key: keyof FilterState, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }))
@@ -327,6 +378,14 @@ function ProductsContent() {
       maxPower: null,
     })
     setCurrentPage(1)
+  }
+
+  const handleManualRefresh = async () => {
+    await fetchProducts(true)
+  }
+
+  const toggleAutoRefresh = () => {
+    setAutoRefresh(prev => !prev)
   }
 
   const addToCompare = (product: any) => {
@@ -400,7 +459,7 @@ function ProductsContent() {
         </div>
       </nav>
 
-      {/* Barra de Topo com estatísticas */}
+      {/* Barra de Topo com estatísticas e atualização */}
       <div className="bg-blue-500/5 border-b border-blue-500/20">
         <div className="container mx-auto px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -409,9 +468,41 @@ function ProductsContent() {
               <div className="flex items-center gap-2"><Factory size={14} className="text-blue-400" /><span>{brands.length} Marcas</span></div>
               <div className="flex items-center gap-2"><Truck size={14} className="text-blue-400" /><span>Frete Grátis acima de 7.500 MZN</span></div>
             </div>
-            <div className="flex items-center gap-2">
-              <Shield size={14} className="text-green-400" />
-              <span className="text-xs text-gray-400">Compra 100% segura</span>
+            <div className="flex items-center gap-4">
+              {/* Indicador de atualização automática */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={toggleAutoRefresh}
+                  className={`flex items-center gap-1 px-2 py-1 text-xs rounded-lg transition-colors ${
+                    autoRefresh 
+                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
+                      : 'bg-gray-800 text-gray-500 border border-gray-700'
+                  }`}
+                >
+                  <RefreshCw size={12} className={autoRefresh ? 'animate-pulse' : ''} />
+                  Auto {autoRefresh ? 'ON' : 'OFF'}
+                </button>
+              </div>
+              
+              {/* Botão refresh manual */}
+              <button
+                onClick={handleManualRefresh}
+                disabled={refreshing}
+                className="flex items-center gap-1 px-3 py-1 bg-gray-800/50 border border-blue-500/30 rounded-lg text-sm hover:bg-gray-800 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+                Atualizar
+              </button>
+              
+              {/* Timestamp da última atualização */}
+              <span className="text-xs text-gray-500">
+                Atualizado: {lastUpdate.toLocaleTimeString()}
+              </span>
+              
+              <div className="flex items-center gap-2">
+                <Shield size={14} className="text-green-400" />
+                <span className="text-xs text-gray-400">Compra 100% segura</span>
+              </div>
             </div>
           </div>
         </div>
@@ -475,6 +566,19 @@ function ProductsContent() {
             <p className="text-sm text-gray-500">{filteredProducts.length} produto(s) encontrado(s)</p>
           </div>
         </div>
+
+        {/* Mensagem de erro */}
+        {error && (
+          <div className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center justify-between">
+            <div className="flex items-center gap-2 text-red-400">
+              <WifiOff size={20} />
+              <span>Erro: {error}</span>
+            </div>
+            <button onClick={handleManualRefresh} className="px-3 py-1 bg-red-500/20 rounded-lg text-sm">
+              Tentar novamente
+            </button>
+          </div>
+        )}
 
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Painel de Filtros Avançado */}
@@ -664,8 +768,12 @@ function ProductsContent() {
 
           {/* Grid de Produtos */}
           <div className="flex-1">
-            {loading ? (
-              <div className="flex items-center justify-center py-20"><div className="relative"><Sun size={48} className="relative text-blue-400 animate-spin-slow" /></div></div>
+            {loading && !refreshing ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="relative">
+                  <Sun size={48} className="relative text-blue-400 animate-spin-slow" />
+                </div>
+              </div>
             ) : paginatedProducts.length === 0 ? (
               <div className="text-center py-20">
                 <Package size={48} className="text-gray-600 mx-auto mb-4" />
@@ -675,9 +783,17 @@ function ProductsContent() {
               </div>
             ) : (
               <>
+                {/* Indicador de refresh em andamento */}
+                {refreshing && (
+                  <div className="fixed top-4 right-4 z-50 bg-black/90 backdrop-blur-sm border border-blue-500/30 rounded-lg px-3 py-2 flex items-center gap-2 text-sm">
+                    <RefreshCw size={14} className="animate-spin text-blue-400" />
+                    <span>Atualizando produtos...</span>
+                  </div>
+                )}
+                
                 <div className={`grid ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6' : 'grid-cols-1 gap-4'}`}>
                   {paginatedProducts.map((product, index) => (
-                    <div key={product.id} className="relative group animate-fade-in-up" style={{ animationDelay: `${index * 0.05}s` }}>
+                    <div key={`${product.id}-${lastUpdate.getTime()}`} className="relative group animate-fade-in-up" style={{ animationDelay: `${index * 0.05}s` }}>
                       <ProductCard product={product} priority={index < 4} />
                       {/* Botões de ação flutuantes */}
                       <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 z-10">
