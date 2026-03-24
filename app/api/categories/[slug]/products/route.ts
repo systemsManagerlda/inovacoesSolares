@@ -1,5 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server'
-import { api } from '@/lib/woocommerce'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,15 +12,14 @@ export async function GET(
     
     console.log('🔍 Buscando categoria por slug:', slug)
     
-    // Primeiro buscar a categoria para obter o ID
-    const categoryResponse = await api.get('products/categories', {
-      params: {
-        slug,
-        per_page: 1
-      }
-    })
+    // 1. Buscar TODAS as categorias
+    const categoriesUrl = `${process.env.NEXT_PUBLIC_WOOCOMMERCE_URL}/wp-json/wc/v3/products/categories?per_page=100&consumer_key=${process.env.WOOCOMMERCE_CONSUMER_KEY}&consumer_secret=${process.env.WOOCOMMERCE_CONSUMER_SECRET}&_=${Date.now()}`
     
-    const category = categoryResponse.data[0]
+    const categoriesRes = await fetch(categoriesUrl, { cache: 'no-store' })
+    const allCategories = await categoriesRes.json()
+    
+    // 2. Encontrar a categoria pelo slug EXATO
+    const category = allCategories.find((cat: any) => cat.slug === slug)
     
     if (!category) {
       console.log('❌ Categoria não encontrada para slug:', slug)
@@ -32,26 +31,24 @@ export async function GET(
     
     console.log('✅ Categoria encontrada:', category.id, category.name)
     
-    // Buscar produtos da categoria específica
-    const productsResponse = await api.get('products', {
-      params: {
-        category: category.id, // Este é o parâmetro correto
-        per_page: 50,
-        orderby: 'date',
-        order: 'desc',
-        status: 'publish' // Apenas produtos publicados
-      }
-    })
+    // 3. Buscar produtos da categoria usando o ID correto
+    const productsUrl = `${process.env.NEXT_PUBLIC_WOOCOMMERCE_URL}/wp-json/wc/v3/products?category=${category.id}&per_page=100&status=publish&consumer_key=${process.env.WOOCOMMERCE_CONSUMER_KEY}&consumer_secret=${process.env.WOOCOMMERCE_CONSUMER_SECRET}&_=${Date.now()}`
     
-    console.log(`📦 Produtos encontrados na categoria ${category.name}:`, productsResponse.data.length)
+    const productsRes = await fetch(productsUrl, { cache: 'no-store' })
+    const products = await productsRes.json()
     
-    return NextResponse.json(productsResponse.data)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    console.log(`📦 Produtos encontrados na categoria ${category.name}:`, products.length)
+    
+    if (products.length > 0) {
+      console.log('Produtos:', products.map((p: any) => p.name))
+    }
+    
+    return NextResponse.json(products)
   } catch (error: any) {
-    console.error('Erro ao buscar produtos da categoria:', error)
+    console.error('Erro:', error)
     return NextResponse.json(
       { error: error.message },
-      { status: error.response?.status || 500 }
+      { status: 500 }
     )
   }
 }

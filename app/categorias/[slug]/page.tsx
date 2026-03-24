@@ -19,8 +19,17 @@ import {
 import ProductCard from '@/components/products/ProductCard'
 import { WooProduct } from '@/types'
 
+interface Category {
+  id: number
+  name: string
+  slug: string
+  description: string
+  image?: { src: string }
+  count: number
+}
+
 // Função para buscar categoria por slug
-async function fetchCategoryBySlug(slug: string) {
+async function fetchCategoryBySlug(slug: string): Promise<Category | null> {
   try {
     const timestamp = Date.now()
     const response = await fetch(`/api/categories/${slug}?_=${timestamp}`, {
@@ -42,8 +51,8 @@ async function fetchCategoryBySlug(slug: string) {
   }
 }
 
-// Função para buscar produtos por categoria
-async function fetchProductsByCategorySlug(slug: string) {
+// Função para buscar produtos da categoria
+async function fetchProductsByCategorySlug(slug: string): Promise<WooProduct[]> {
   try {
     const timestamp = Date.now()
     const response = await fetch(`/api/categories/${slug}/products?_=${timestamp}`, {
@@ -58,7 +67,9 @@ async function fetchProductsByCategorySlug(slug: string) {
       return []
     }
     
-    return await response.json()
+    const products = await response.json()
+    console.log(`📦 Produtos recebidos: ${products.length}`)
+    return products
   } catch (error) {
     console.error('Erro ao buscar produtos:', error)
     return []
@@ -75,7 +86,7 @@ export default function CategoryPage() {
   const params = useParams()
   const slug = params?.slug as string
   
-  const [category, setCategory] = useState<any>(null)
+  const [category, setCategory] = useState<Category | null>(null)
   const [products, setProducts] = useState<WooProduct[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -92,18 +103,25 @@ export default function CategoryPage() {
       setError(null)
       
       try {
+        console.log(`🔍 Carregando categoria: ${slug}`)
+        
         // Buscar categoria
         const categoryData = await fetchCategoryBySlug(slug)
         
         if (!categoryData) {
+          console.log('❌ Categoria não encontrada')
           notFound()
           return
         }
         
         setCategory(categoryData)
+        console.log(`✅ Categoria encontrada: ${categoryData.name} (ID: ${categoryData.id})`)
         
         // Buscar produtos da categoria
         const productsData = await fetchProductsByCategorySlug(slug)
+        
+        console.log(`📦 Produtos encontrados: ${productsData.length}`)
+        
         setProducts(productsData)
         setFilteredProducts(productsData)
       } catch (err) {
@@ -154,7 +172,8 @@ export default function CategoryPage() {
     if (name.includes('controlador')) return Zap
     if (name.includes('ilumina') || name.includes('lamp')) return Sun
     if (name.includes('acessorio') || name.includes('acessórios')) return Sparkles
-    if (name.includes('kit')) return Zap
+    if (name.includes('kit') || name.includes('box')) return Zap
+    if (name.includes('bomba')) return Zap
     return Sun
   }
 
