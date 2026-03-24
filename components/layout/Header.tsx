@@ -16,18 +16,61 @@ import {
   Sparkles,
   XCircle,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
 import UserMenu from "./UserMenu";
 
-// Categorias com ícones solares
-const categories = [
-  { name: "Painéis Solares", href: "#", icon: Sun },
-  { name: "Inversores", href: "#", icon: Zap },
-  { name: "Baterias", href: "#", icon: Sparkles },
-  { name: "Controladores", href: "#", icon: Zap },
-  { name: "Iluminação Solar", href: "#", icon: Sun },
-  { name: "Acessórios", href: "#", icon: Sparkles },
-];
+// Interface para categoria do WooCommerce
+interface WooCategory {
+  id: number;
+  name: string;
+  slug: string;
+  image?: {
+    src: string;
+    alt?: string;
+  };
+  count: number;
+}
+
+// Mapeamento de ícones baseado no nome da categoria
+const getCategoryIcon = (categoryName: string) => {
+  const name = categoryName.toLowerCase();
+  if (name.includes("painel") || name.includes("placa")) return Sun;
+  if (name.includes("inversor")) return Zap;
+  if (name.includes("bateria")) return Sparkles;
+  if (name.includes("controlador")) return Zap;
+  if (name.includes("ilumina") || name.includes("lamp")) return Sun;
+  if (name.includes("acessorio") || name.includes("acessórios")) return Sparkles;
+  if (name.includes("kit")) return Zap;
+  return Sun; // ícone padrão
+};
+
+// Função para buscar categorias da API
+async function fetchCategories(): Promise<WooCategory[]> {
+  try {
+    const timestamp = Date.now();
+    const response = await fetch(
+      `/api/woocommerce?endpoint=products/categories&per_page=50&hide_empty=true&_=${timestamp}`,
+      {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        }
+      }
+    );
+    
+    if (!response.ok) {
+      console.error('Erro ao buscar categorias:', response.status);
+      return [];
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Erro ao buscar categorias:', error);
+    return [];
+  }
+}
 
 // Componente de Modal de Busca
 function SearchModal({
@@ -67,7 +110,10 @@ function SearchModal({
     try {
       // Buscar produtos da API WooCommerce
       const response = await fetch(
-        `/api/woocommerce?endpoint=products&search=${encodeURIComponent(searchTerm)}&per_page=10`,
+        `/api/woocommerce?endpoint=products&search=${encodeURIComponent(searchTerm)}&per_page=10&_=${Date.now()}`,
+        {
+          cache: 'no-store',
+        }
       );
       const data = await response.json();
       setSearchResults(data);
@@ -144,7 +190,7 @@ function SearchModal({
           <div className="max-h-96 overflow-y-auto p-4 pt-0 border-t border-blue-500/20">
             {isSearching ? (
               <div className="flex items-center justify-center py-8">
-                <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                <Loader2 size={24} className="text-blue-400 animate-spin" />
               </div>
             ) : searchResults.length > 0 ? (
               <div className="space-y-2">
@@ -241,7 +287,21 @@ export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [categories, setCategories] = useState<WooCategory[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const { items, toggleCart } = useCart();
+
+  // Buscar categorias do WooCommerce
+  useEffect(() => {
+    const loadCategories = async () => {
+      setIsLoadingCategories(true);
+      const data = await fetchCategories();
+      setCategories(data);
+      setIsLoadingCategories(false);
+    };
+    
+    loadCategories();
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 10);
@@ -267,6 +327,9 @@ export default function Header() {
     console.log("Usuário desconectado");
     setIsUserMenuOpen(false);
   };
+
+  // Categorias a serem exibidas (limitadas a 6 para o menu)
+  const displayedCategories = categories.slice(0, 6);
 
   return (
     <>
@@ -306,27 +369,39 @@ export default function Header() {
                 </span>
               </div>
             </Link>
+
             {/* Navegação Desktop */}
             <nav className="hidden lg:flex items-center space-x-1">
-              {categories.map((category) => {
-                const Icon = category.icon;
-                return (
-                  <Link
-                    key={category.name}
-                    href={category.href}
-                    className="relative group px-4 py-2 text-gray-300 hover:text-blue-400 transition-colors font-medium flex items-center gap-2"
-                  >
-                    <Icon
-                      size={16}
-                      className="text-blue-500/50 group-hover:text-blue-400 transition-colors"
-                    />
-                    <span>{category.name}</span>
+              {isLoadingCategories ? (
+                // Loading state
+                <div className="flex items-center gap-2 px-4 py-2">
+                  <Loader2 size={16} className="text-blue-400 animate-spin" />
+                  <span className="text-gray-400 text-sm">Carregando...</span>
+                </div>
+              ) : displayedCategories.length > 0 ? (
+                displayedCategories.map((category) => {
+                  const Icon = getCategoryIcon(category.name);
+                  return (
+                    <Link
+                      key={category.id}
+                      href={`/categorias/${category.slug}`}
+                      className="relative group px-4 py-2 text-gray-300 hover:text-blue-400 transition-colors font-medium flex items-center gap-2"
+                    >
+                      <Icon
+                        size={16}
+                        className="text-blue-500/50 group-hover:text-blue-400 transition-colors"
+                      />
+                      <span>{category.name}</span>
 
-                    {/* Efeito de hover */}
-                    <span className="absolute bottom-0 left-0 w-full h-0.5 bg-linear-to-r from-blue-500 to-blue-600 scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
-                  </Link>
-                );
-              })}
+                      {/* Efeito de hover */}
+                      <span className="absolute bottom-0 left-0 w-full h-0.5 bg-linear-to-r from-blue-500 to-blue-600 scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
+                    </Link>
+                  );
+                })
+              ) : (
+                // Fallback se não houver categorias
+                <span className="text-gray-500 text-sm px-4">Nenhuma categoria</span>
+              )}
             </nav>
 
             {/* Ícones à direita */}
@@ -341,7 +416,7 @@ export default function Header() {
                 <span className="sr-only">Buscar</span>
               </button>
 
-              {/* Botão Usuário - AGORA FUNCIONAL */}
+              {/* Botão Usuário */}
               <button
                 onClick={() => setIsUserMenuOpen(true)}
                 className="relative group p-2 text-gray-400 hover:text-blue-400 transition-colors"
@@ -383,30 +458,42 @@ export default function Header() {
           <div
             className={`lg:hidden overflow-hidden transition-all duration-300 ${
               isMobileMenuOpen ? "max-h-[80vh] opacity-100 overflow-y-auto" : "max-h-0 opacity-0"
-            } ${isMobileMenuOpen ? "bg-blue-600" : "bg-transparent"}`}
+            }`}
           >
             <div className="py-4 pb-6 border-t border-blue-500/20">
               <nav className="flex flex-col space-y-1">
-                {categories.map((category) => {
-                  const Icon = category.icon;
-                  return (
-                    <Link
-                      key={category.name}
-                      href={category.href}
-                      className="flex items-center gap-3 px-4 py-3 hover:bg-blue-500/20 rounded-lg text-white hover:text-blue-200 transition-all group"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      <Icon
-                        size={18}
-                        className="text-blue-200 group-hover:text-white"
-                      />
-                      <span className="font-medium">{category.name}</span>
+                {isLoadingCategories ? (
+                  // Loading state no mobile
+                  <div className="flex items-center justify-center gap-2 py-4">
+                    <Loader2 size={20} className="text-blue-400 animate-spin" />
+                    <span className="text-gray-400">Carregando categorias...</span>
+                  </div>
+                ) : displayedCategories.length > 0 ? (
+                  displayedCategories.map((category) => {
+                    const Icon = getCategoryIcon(category.name);
+                    return (
+                      <Link
+                        key={category.id}
+                        href={`/categorias/${category.slug}`}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-blue-500/20 rounded-lg text-white hover:text-blue-200 transition-all group"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <Icon
+                          size={18}
+                          className="text-blue-200 group-hover:text-white"
+                        />
+                        <span className="font-medium">{category.name}</span>
 
-                      {/* Efeito de brilho no hover */}
-                      <span className="ml-auto w-1 h-6 bg-linear-to-b from-blue-400 to-blue-300 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </Link>
-                  );
-                })}
+                        {/* Efeito de brilho no hover */}
+                        <span className="ml-auto w-1 h-6 bg-linear-to-b from-blue-400 to-blue-300 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </Link>
+                    );
+                  })
+                ) : (
+                  <span className="text-gray-500 text-center py-4">
+                    Nenhuma categoria disponível
+                  </span>
+                )}
               </nav>
 
               {/* Opções mobile adicionais */}

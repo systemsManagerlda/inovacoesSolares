@@ -10,10 +10,65 @@ import {
   Sun,
   Zap,
   Sparkles,
+  Loader2,
 } from "lucide-react";
 
-export default function Footer() {
+// Interface para categoria do WooCommerce
+interface WooCategory {
+  id: number;
+  name: string;
+  slug: string;
+  count: number;
+}
+
+// Função para buscar categorias da API
+async function fetchCategories(): Promise<WooCategory[]> {
+  try {
+    const timestamp = Date.now();
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_WOOCOMMERCE_URL}/wp-json/wc/v3/products/categories?per_page=20&hide_empty=true&consumer_key=${process.env.WOOCOMMERCE_CONSUMER_KEY}&consumer_secret=${process.env.WOOCOMMERCE_CONSUMER_SECRET}&_=${timestamp}`,
+      {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        }
+      }
+    );
+    
+    if (!response.ok) {
+      console.error('Erro ao buscar categorias:', response.status);
+      return [];
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Erro ao buscar categorias:', error);
+    return [];
+  }
+}
+
+// Mapeamento de ícones baseado no nome da categoria
+const getCategoryIcon = (categoryName: string) => {
+  const name = categoryName.toLowerCase();
+  if (name.includes("painel") || name.includes("placa")) return Sun;
+  if (name.includes("inversor")) return Zap;
+  if (name.includes("bateria")) return Sparkles;
+  if (name.includes("controlador")) return Zap;
+  if (name.includes("ilumina") || name.includes("lamp")) return Sun;
+  if (name.includes("acessorio") || name.includes("acessórios")) return Sparkles;
+  if (name.includes("kit")) return Zap;
+  return Sun;
+};
+
+export default async function Footer() {
   const currentYear = new Date().getFullYear();
+  
+  // Buscar categorias no servidor
+  const categories = await fetchCategories();
+  
+  // Categorias principais para exibir (limitadas a 6)
+  const mainCategories = categories.slice(0, 6);
 
   return (
     <footer className="relative bg-black text-gray-300 overflow-hidden border-t border-blue-500/20">
@@ -93,31 +148,58 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Produtos */}
+          {/* Produtos - Categorias dinâmicas do WooCommerce */}
           <div>
             <h4 className="font-semibold text-white mb-4 flex items-center gap-2">
               <Zap size={18} className="text-blue-400" />
               Produtos
             </h4>
-            <ul className="space-y-2">
-              {[
-                { name: "Painéis Solares", href: "#" },
-                { name: "Inversores", href: "#" },
-                { name: "Baterias", href: "#" },
-                { name: "Controladores", href: "#" },
-                { name: "Iluminação Solar", href: "#" },
-              ].map((item) => (
-                <li key={item.name}>
-                  <Link
-                    href={item.href}
-                    className="text-gray-400 hover:text-blue-400 transition-colors flex items-center gap-2 group"
-                  >
-                    <span className="w-1 h-1 bg-blue-500/50 rounded-full group-hover:bg-blue-400 transition-colors" />
-                    {item.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            {mainCategories.length > 0 ? (
+              <ul className="space-y-2">
+                {mainCategories.map((category) => {
+                  const Icon = getCategoryIcon(category.name);
+                  return (
+                    <li key={category.id}>
+                      <Link
+                        href={`/categorias/${category.slug}`}
+                        className="text-gray-400 hover:text-blue-400 transition-colors flex items-center gap-2 group"
+                      >
+                        <span className="w-1 h-1 bg-blue-500/50 rounded-full group-hover:bg-blue-400 transition-colors" />
+                        <Icon size={14} className="text-blue-500/50 group-hover:text-blue-400" />
+                        {category.name}
+                        {category.count > 0 && (
+                          <span className="text-xs text-gray-600 group-hover:text-blue-400/70">
+                            ({category.count})
+                          </span>
+                        )}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <ul className="space-y-2">
+                {/* Fallback estático caso não carregue categorias */}
+                {[
+                  { name: "Painéis Solares", href: "/categorias/paineis-solares", icon: Sun },
+                  { name: "Inversores", href: "/categorias/inversores", icon: Zap },
+                  { name: "Baterias", href: "/categorias/baterias", icon: Sparkles },
+                  { name: "Controladores", href: "/categorias/controladores", icon: Zap },
+                  { name: "Iluminação Solar", href: "/categorias/iluminacao-solar", icon: Sun },
+                ].map((item) => (
+                  <li key={item.name}>
+                    <Link
+                      href={item.href}
+                      className="text-gray-400 hover:text-blue-400 transition-colors flex items-center gap-2 group"
+                    >
+                      <span className="w-1 h-1 bg-blue-500/50 rounded-full group-hover:bg-blue-400 transition-colors" />
+                      <item.icon size={14} className="text-blue-500/50 group-hover:text-blue-400" />
+                      {item.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {/* Suporte */}
@@ -178,7 +260,7 @@ export default function Footer() {
                 </div>
                 <div>
                   <span className="text-xs text-gray-500">Endereço</span>
-                  <p className="text-sm">Av.Trabalho perto da Moçambique , Maputo, Mozambique</p>
+                  <p className="text-sm">Av.Trabalho perto da Moçambique, Maputo, Mozambique</p>
                 </div>
               </li>
             </ul>
@@ -222,13 +304,13 @@ export default function Footer() {
           </p>
           <div className="flex gap-4 text-xs text-gray-600">
             <Link
-              href="#"
+              href="/politica-privacidade"
               className="hover:text-blue-400 transition-colors"
             >
               Política de Privacidade
             </Link>
             <Link
-              href="#"
+              href="/termos-uso"
               className="hover:text-blue-400 transition-colors"
             >
               Termos de Uso

@@ -22,6 +22,7 @@ export interface CartContextType {
 }
 
 export interface WooProduct {
+  date_created: string | number | Date
   id: number
   name: string
   slug: string
