@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export interface CartItem {
   id: number
   name: string
@@ -22,6 +23,7 @@ export interface CartContextType {
 }
 
 export interface WooProduct {
+  brand: any
   date_created: string | number | Date
   id: number
   name: string
