@@ -77,6 +77,26 @@ const slides: Slide[] = [
     link: '/produtos',
     badge: '👨‍🔧 Profissional'
   },
+  {
+  id: 7,
+  title: 'Instalação de Sistemas Elétricos',
+  subtitle: 'Montagem e Configuração',
+  description: 'Equipe técnica especializada realizando montagem e configuração de quadros elétricos com segurança, precisão e padrões profissionais',
+  image: '/images/hero7.jpeg',
+  cta: 'Solicitar Serviço',
+  link: '#',
+  badge: '⚡ Técnico'
+},
+{
+  id: 8,
+  title: 'Energia Solar Industrial',
+  subtitle: 'Eficiência e Sustentabilidade',
+  description: 'Sistema de painéis solares instalado em ambiente industrial, garantindo redução de custos energéticos e maior sustentabilidade',
+  image: '/images/hero8.jpeg',
+  cta: 'Solicitar Orçamento',
+  link: '#',
+  badge: '☀️ Sustentável'
+}
 ]
 
 // Posições fixas para partículas de luz
