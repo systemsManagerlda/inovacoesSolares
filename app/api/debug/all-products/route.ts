@@ -7,7 +7,7 @@ export async function GET() {
   try {
     const timestamp = Date.now()
     // Buscar todos os produtos de uma vez (per_page=100)
-    const url = `${process.env.NEXT_PUBLIC_WOOCOMMERCE_URL}/wp-json/wc/v3/products?per_page=100&status=publish&consumer_key=${process.env.WOOCOMMERCE_CONSUMER_KEY}&consumer_secret=${process.env.WOOCOMMERCE_CONSUMER_SECRET}&_=${timestamp}`
+    const url = `${process.env.NEXT_WOOCOMMERCE_URL}/wp-json/wc/v3/products?per_page=100&status=publish&consumer_key=${process.env.WOOCOMMERCE_CONSUMER_KEY}&consumer_secret=${process.env.WOOCOMMERCE_CONSUMER_SECRET}&_=${timestamp}`
     
     console.log('🔍 Buscando todos os produtos...')
     

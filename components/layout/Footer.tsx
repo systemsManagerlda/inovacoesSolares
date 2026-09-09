@@ -26,7 +26,7 @@ async function fetchCategories(): Promise<WooCategory[]> {
   try {
     const timestamp = Date.now();
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_WOOCOMMERCE_URL}/wp-json/wc/v3/products/categories?per_page=20&hide_empty=true&consumer_key=${process.env.WOOCOMMERCE_CONSUMER_KEY}&consumer_secret=${process.env.WOOCOMMERCE_CONSUMER_SECRET}&_=${timestamp}`,
+      `${process.env.NEXT_WOOCOMMERCE_URL}/wp-json/wc/v3/products/categories?per_page=20&hide_empty=true&consumer_key=${process.env.WOOCOMMERCE_CONSUMER_KEY}&consumer_secret=${process.env.WOOCOMMERCE_CONSUMER_SECRET}&_=${timestamp}`,
       {
         cache: 'no-store',
         headers: {

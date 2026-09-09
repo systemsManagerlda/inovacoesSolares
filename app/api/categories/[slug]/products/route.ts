@@ -13,7 +13,7 @@ export async function GET(
     console.log('🔍 Buscando categoria por slug:', slug)
     
     // 1. Buscar TODAS as categorias
-    const categoriesUrl = `${process.env.NEXT_PUBLIC_WOOCOMMERCE_URL}/wp-json/wc/v3/products/categories?per_page=100&consumer_key=${process.env.WOOCOMMERCE_CONSUMER_KEY}&consumer_secret=${process.env.WOOCOMMERCE_CONSUMER_SECRET}&_=${Date.now()}`
+    const categoriesUrl = `${process.env.NEXT_WOOCOMMERCE_URL}/wp-json/wc/v3/products/categories?per_page=100&consumer_key=${process.env.WOOCOMMERCE_CONSUMER_KEY}&consumer_secret=${process.env.WOOCOMMERCE_CONSUMER_SECRET}&_=${Date.now()}`
     
     const categoriesRes = await fetch(categoriesUrl, { cache: 'no-store' })
     const allCategories = await categoriesRes.json()
@@ -32,7 +32,7 @@ export async function GET(
     console.log('✅ Categoria encontrada:', category.id, category.name)
     
     // 3. Buscar produtos da categoria usando o ID correto
-    const productsUrl = `${process.env.NEXT_PUBLIC_WOOCOMMERCE_URL}/wp-json/wc/v3/products?category=${category.id}&per_page=100&status=publish&consumer_key=${process.env.WOOCOMMERCE_CONSUMER_KEY}&consumer_secret=${process.env.WOOCOMMERCE_CONSUMER_SECRET}&_=${Date.now()}`
+    const productsUrl = `${process.env.NEXT_WOOCOMMERCE_URL}/wp-json/wc/v3/products?category=${category.id}&per_page=100&status=publish&consumer_key=${process.env.WOOCOMMERCE_CONSUMER_KEY}&consumer_secret=${process.env.WOOCOMMERCE_CONSUMER_SECRET}&_=${Date.now()}`
     
     const productsRes = await fetch(productsUrl, { cache: 'no-store' })
     const products = await productsRes.json()

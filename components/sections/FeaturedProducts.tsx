@@ -9,7 +9,7 @@ async function getProducts(): Promise<WooProduct[]> {
     const timestamp = Date.now()
     
     // Buscar produtos em destaque via fetch direto
-    const featuredUrl = `${process.env.NEXT_PUBLIC_WOOCOMMERCE_URL}/wp-json/wc/v3/products?featured=true&per_page=8&status=publish&consumer_key=${process.env.WOOCOMMERCE_CONSUMER_KEY}&consumer_secret=${process.env.WOOCOMMERCE_CONSUMER_SECRET}&_=${timestamp}`
+    const featuredUrl = `${process.env.NEXT_WOOCOMMERCE_URL}/wp-json/wc/v3/products?featured=true&per_page=8&status=publish&consumer_key=${process.env.WOOCOMMERCE_CONSUMER_KEY}&consumer_secret=${process.env.WOOCOMMERCE_CONSUMER_SECRET}&_=${timestamp}`
     
     const featuredResponse = await fetch(featuredUrl, {
       cache: 'no-store',
@@ -30,7 +30,7 @@ async function getProducts(): Promise<WooProduct[]> {
     console.log('⚠️ Nenhum produto em destaque. Buscando produtos de categorias diferentes...')
     
     // Buscar categorias
-    const categoriesUrl = `${process.env.NEXT_PUBLIC_WOOCOMMERCE_URL}/wp-json/wc/v3/products/categories?per_page=50&hide_empty=true&consumer_key=${process.env.WOOCOMMERCE_CONSUMER_KEY}&consumer_secret=${process.env.WOOCOMMERCE_CONSUMER_SECRET}&_=${timestamp}`
+    const categoriesUrl = `${process.env.NEXT_WOOCOMMERCE_URL}/wp-json/wc/v3/products/categories?per_page=50&hide_empty=true&consumer_key=${process.env.WOOCOMMERCE_CONSUMER_KEY}&consumer_secret=${process.env.WOOCOMMERCE_CONSUMER_SECRET}&_=${timestamp}`
     
     const categoriesRes = await fetch(categoriesUrl, { cache: 'no-store' })
     const categories = await categoriesRes.json()
@@ -46,7 +46,7 @@ async function getProducts(): Promise<WooProduct[]> {
     const categoriesToFetch = categories.slice(0, 8)
     
     for (const category of categoriesToFetch) {
-      const productUrl = `${process.env.NEXT_PUBLIC_WOOCOMMERCE_URL}/wp-json/wc/v3/products?category=${category.id}&per_page=1&status=publish&consumer_key=${process.env.WOOCOMMERCE_CONSUMER_KEY}&consumer_secret=${process.env.WOOCOMMERCE_CONSUMER_SECRET}&_=${timestamp}`
+      const productUrl = `${process.env.NEXT_WOOCOMMERCE_URL}/wp-json/wc/v3/products?category=${category.id}&per_page=1&status=publish&consumer_key=${process.env.WOOCOMMERCE_CONSUMER_KEY}&consumer_secret=${process.env.WOOCOMMERCE_CONSUMER_SECRET}&_=${timestamp}`
       
       const productRes = await fetch(productUrl, { cache: 'no-store' })
       const productData = await productRes.json()
@@ -63,7 +63,7 @@ async function getProducts(): Promise<WooProduct[]> {
     
     // Fallback: produtos recentes
     console.log('⚠️ Buscando produtos recentes como fallback...')
-    const recentUrl = `${process.env.NEXT_PUBLIC_WOOCOMMERCE_URL}/wp-json/wc/v3/products?per_page=8&status=publish&orderby=date&order=desc&consumer_key=${process.env.WOOCOMMERCE_CONSUMER_KEY}&consumer_secret=${process.env.WOOCOMMERCE_CONSUMER_SECRET}&_=${timestamp}`
+    const recentUrl = `${process.env.NEXT_WOOCOMMERCE_URL}/wp-json/wc/v3/products?per_page=8&status=publish&orderby=date&order=desc&consumer_key=${process.env.WOOCOMMERCE_CONSUMER_KEY}&consumer_secret=${process.env.WOOCOMMERCE_CONSUMER_SECRET}&_=${timestamp}`
     
     const recentRes = await fetch(recentUrl, { cache: 'no-store' })
     const recentProducts = await recentRes.json()
