@@ -17,6 +17,7 @@ import {
   XCircle,
   ChevronRight,
   Loader2,
+  BarChart3,
 } from "lucide-react";
 import UserMenu from "./UserMenu";
 
@@ -402,6 +403,19 @@ export default function Header() {
                 // Fallback se não houver categorias
                 <span className="text-gray-500 text-sm px-4">Nenhuma categoria</span>
               )}
+
+              {/* Área Comercial */}
+              <Link
+                href="/login"
+                className="relative group px-4 py-2 text-gray-300 hover:text-blue-400 transition-colors font-medium flex items-center gap-2"
+              >
+                <BarChart3
+                  size={16}
+                  className="text-blue-500/50 group-hover:text-blue-400 transition-colors"
+                />
+                <span>Área Comercial</span>
+                <span className="absolute bottom-0 left-0 w-full h-0.5 bg-linear-to-r from-blue-500 to-blue-600 scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
+              </Link>
             </nav>
 
             {/* Ícones à direita */}
@@ -495,6 +509,18 @@ export default function Header() {
                   </span>
                 )}
               </nav>
+
+              {/* Área Comercial Mobile */}
+              <div className="mt-3 px-2">
+                <Link
+                  href="/login"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-500/20 border border-blue-400/20 rounded-lg text-blue-200 hover:bg-blue-500/30 hover:text-white transition-all"
+                >
+                  <BarChart3 size={18} />
+                  <span className="text-sm font-semibold">Área Comercial</span>
+                </Link>
+              </div>
 
               {/* Opções mobile adicionais */}
               <div className="mt-4 pt-4 border-t border-blue-400/30 px-2">
