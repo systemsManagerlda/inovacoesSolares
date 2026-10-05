@@ -6,69 +6,72 @@ import {
   Building2,
   Factory,
   Sprout,
-  Droplets,
   Zap,
   BatteryCharging,
   CheckCircle2,
   Plus,
   Minus,
-  MessageCircle,
+  FileDown,
   Sun,
 } from "lucide-react";
+
+import jsPDF from "jspdf";
+import QRCode from "qrcode";
 
 type Equipment = {
   id: string;
   name: string;
   icon?: string;
   quantity: number;
+  power: number; // potência unitária em Watts
 };
 
 const residentialEquipment: Equipment[] = [
-  { id: "frigorifico", name: "Frigorífico", quantity: 0 },
-  { id: "congelador", name: "Congelador", quantity: 0 },
-  { id: "ar", name: "Ar condicionado", quantity: 0 },
-  { id: "televisao", name: "Televisão", quantity: 0 },
-  { id: "ventoinha", name: "Ventoinha", quantity: 0 },
-  { id: "maquina-lavar", name: "Máquina de lavar", quantity: 0 },
-  { id: "ferro", name: "Ferro de engomar", quantity: 0 },
-  { id: "microondas", name: "Micro-ondas", quantity: 0 },
-  { id: "fogao", name: "Fogão eléctrico", quantity: 0 },
-  { id: "bomba-agua", name: "Bomba de água", quantity: 0 },
-  { id: "computador", name: "Computador", quantity: 0 },
-  { id: "iluminacao", name: "Iluminação", quantity: 0 },
+  { id: "frigorifico", name: "Frigorífico", quantity: 0, power: 150 },
+  { id: "congelador", name: "Congelador", quantity: 0, power: 200 },
+  { id: "ar", name: "Ar condicionado", quantity: 0, power: 1200 },
+  { id: "televisao", name: "Televisão", quantity: 0, power: 100 },
+  { id: "ventoinha", name: "Ventoinha", quantity: 0, power: 60 },
+  { id: "maquina-lavar", name: "Máquina de lavar", quantity: 0, power: 500 },
+  { id: "ferro", name: "Ferro de engomar", quantity: 0, power: 1000 },
+  { id: "microondas", name: "Micro-ondas", quantity: 0, power: 1000 },
+  { id: "fogao", name: "Fogão eléctrico", quantity: 0, power: 2000 },
+  { id: "bomba-agua", name: "Bomba de água", quantity: 0, power: 750 },
+  { id: "computador", name: "Computador", quantity: 0, power: 150 },
+  { id: "iluminacao", name: "Iluminação", quantity: 0, power: 20 },
 ];
 
 const agriculturalEquipment: Equipment[] = [
-  { id: "bomba-submersivel", name: "Bomba submersível", quantity: 0 },
-  { id: "bomba-superficie", name: "Bomba de superfície", quantity: 0 },
-  { id: "bomba-irrigacao", name: "Bomba de irrigação", quantity: 0 },
-  { id: "motor-electrico", name: "Motor eléctrico", quantity: 0 },
-  { id: "camara-frigorifica", name: "Câmara frigorífica", quantity: 0 },
-  { id: "ordenhadora", name: "Ordenhadora", quantity: 0 },
-  { id: "avicultura", name: "Equipamentos de avicultura", quantity: 0 },
-  { id: "estufa", name: "Equipamentos de estufa", quantity: 0 },
-  { id: "processamento", name: "Máquinas de processamento", quantity: 0 },
-  { id: "iluminacao-agricola", name: "Iluminação", quantity: 0 },
+  { id: "bomba-submersivel", name: "Bomba submersível", quantity: 0, power: 1100 },
+  { id: "bomba-superficie", name: "Bomba de superfície", quantity: 0, power: 750 },
+  { id: "bomba-irrigacao", name: "Bomba de irrigação", quantity: 0, power: 1500 },
+  { id: "motor-electrico", name: "Motor eléctrico", quantity: 0, power: 1500 },
+  { id: "camara-frigorifica", name: "Câmara frigorífica", quantity: 0, power: 3000 },
+  { id: "ordenhadora", name: "Ordenhadora", quantity: 0, power: 1200 },
+  { id: "avicultura", name: "Equipamentos de avicultura", quantity: 0, power: 800 },
+  { id: "estufa", name: "Equipamentos de estufa", quantity: 0, power: 1000 },
+  { id: "processamento", name: "Máquinas de processamento", quantity: 0, power: 2500 },
+  { id: "iluminacao-agricola", name: "Iluminação", quantity: 0, power: 30 },
 ];
 
 const commercialEquipment: Equipment[] = [
-  { id: "ar-comercial", name: "Ar condicionado", quantity: 0 },
-  { id: "frigorifico-comercial", name: "Frigoríficos", quantity: 0 },
-  { id: "congelador-comercial", name: "Congeladores", quantity: 0 },
-  { id: "computadores", name: "Computadores", quantity: 0 },
-  { id: "impressoras", name: "Impressoras", quantity: 0 },
-  { id: "iluminacao-comercial", name: "Iluminação", quantity: 0 },
-  { id: "bombas-comercial", name: "Bombas de água", quantity: 0 },
-  { id: "maquinas", name: "Máquinas/equipamentos", quantity: 0 },
+  { id: "ar-comercial", name: "Ar condicionado", quantity: 0, power: 1500 },
+  { id: "frigorifico-comercial", name: "Frigoríficos", quantity: 0, power: 300 },
+  { id: "congelador-comercial", name: "Congeladores", quantity: 0, power: 400 },
+  { id: "computadores", name: "Computadores", quantity: 0, power: 200 },
+  { id: "impressoras", name: "Impressoras", quantity: 0, power: 300 },
+  { id: "iluminacao-comercial", name: "Iluminação", quantity: 0, power: 30 },
+  { id: "bombas-comercial", name: "Bombas de água", quantity: 0, power: 750 },
+  { id: "maquinas", name: "Máquinas/equipamentos", quantity: 0, power: 1500 },
 ];
 
 const industrialEquipment: Equipment[] = [
-  { id: "motores", name: "Motores eléctricos", quantity: 0 },
-  { id: "compressores", name: "Compressores", quantity: 0 },
-  { id: "bombas-industriais", name: "Bombas industriais", quantity: 0 },
-  { id: "maquinas-industriais", name: "Máquinas industriais", quantity: 0 },
-  { id: "frio-industrial", name: "Refrigeração industrial", quantity: 0 },
-  { id: "iluminacao-industrial", name: "Iluminação", quantity: 0 },
+  { id: "motores", name: "Motores eléctricos", quantity: 0, power: 2200 },
+  { id: "compressores", name: "Compressores", quantity: 0, power: 3000 },
+  { id: "bombas-industriais", name: "Bombas industriais", quantity: 0, power: 2200 },
+  { id: "maquinas-industriais", name: "Máquinas industriais", quantity: 0, power: 5000 },
+  { id: "frio-industrial", name: "Refrigeração industrial", quantity: 0, power: 4000 },
+  { id: "iluminacao-industrial", name: "Iluminação", quantity: 0, power: 50 },
 ];
 
 const typeOptions = [
@@ -255,128 +258,467 @@ export default function SolarDiagnosisForm() {
     (item) => item.quantity > 0
   );
 
-  function sendWhatsApp() {
+      async function generatePDF() {
     if (!name || !phone) {
-      alert(
-        "Por favor, indique o seu nome e contacto."
-      );
+      alert("Por favor, indique o seu nome e contacto.");
       return;
     }
 
     if (!projectType) {
-      alert(
-        "Por favor, seleccione o tipo de projecto."
-      );
+      alert("Por favor, seleccione o tipo de projecto.");
       return;
     }
 
-    const equipmentText =
+    const priorityLabels: Record<string, string> = {
+      "reducao-factura": "Reduzir a factura da EDM",
+      cortes: "Ter energia durante cortes",
+      autonomia: "Ter maior autonomia energética",
+      bombas: "Alimentar bombas de água",
+      irrigacao: "Irrigação agrícola",
+      gerador: "Substituir gerador",
+      negocio: "Proteger o meu negócio",
+      custos: "Reduzir custos operacionais",
+      sustentabilidade: "Energia limpa e sustentável",
+    };
+
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 40;
+    const contentWidth = pageWidth - margin * 2;
+
+    // ---------- CORES ----------
+    const dark = [15, 23, 42] as const;
+    const blue = [37, 99, 235] as const;
+    const yellow = [250, 204, 21] as const;
+    const gray = [100, 116, 139] as const;
+    const lightGray = [241, 245, 249] as const;
+
+    // ================= CABEÇALHO =================
+    // Logo
+    try {
+      const logoData = await fetch("/logo.png").then((r) => r.blob());
+      const logoBase64: string = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(logoData);
+      });
+      doc.addImage(logoBase64, "PNG", margin, 20, 65, 65);
+    } catch {
+      // sem logo, não bloqueia
+    }
+
+    // Nome + dados da empresa
+    doc.setTextColor(blue[0], blue[1], blue[2]);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("Inovacoes Solares, Lda", margin + 80, 38);
+
+    doc.setTextColor(gray[0], gray[1], gray[2]);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.text(
+      "Av. do Trabalho, Bairro da Malanga, Nr. 1235. R/C",
+      margin + 80,
+      52
+    );
+    doc.text("NUIT: 401143025", margin + 80, 64);
+    doc.text(
+      "Email: inovacoessolares@gmail.com",
+      margin + 80,
+      76
+    );
+    doc.text(
+      "Telefone: (+258) 84 113 8173 | (+258) 87 113 8173",
+      margin + 80,
+      88
+    );
+
+    // Linha separadora
+    doc.setDrawColor(blue[0], blue[1], blue[2]);
+    doc.setLineWidth(1.5);
+    doc.line(margin, 102, pageWidth - margin, 102);
+
+    let y = 122;
+
+    // ================= CLIENTE + TÍTULO =================
+    const clientBoxWidth = contentWidth * 0.55;
+    doc.setFillColor(lightGray[0], lightGray[1], lightGray[2]);
+    doc.roundedRect(margin, y, clientBoxWidth, 52, 6, 6, "F");
+
+    doc.setTextColor(dark[0], dark[1], dark[2]);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text(name, margin + 12, y + 18);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(gray[0], gray[1], gray[2]);
+    doc.text(`Telefone: ${phone}`, margin + 12, y + 32);
+    doc.text(
+      `Província: ${province || "Não informado"}`,
+      margin + 12,
+      y + 45
+    );
+
+    // Título
+    doc.setTextColor(dark[0], dark[1], dark[2]);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("Dimensionamento de Sistema Solar", pageWidth - margin, y + 24, {
+      align: "right",
+    });
+
+    doc.setTextColor(blue[0], blue[1], blue[2]);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(
+      `Data: ${new Date().toISOString().slice(0, 10)}`,
+      pageWidth - margin,
+      y + 42,
+      { align: "right" }
+    );
+
+    y += 70;
+
+    // ================= INFO PROJECTO =================
+    doc.setDrawColor(220, 220, 220);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 16;
+
+    doc.setTextColor(gray[0], gray[1], gray[2]);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.text("Projecto:", margin, y);
+    doc.text("Tipologia:", margin + 160, y);
+    doc.text("Área:", margin + 290, y);
+    doc.text("Prioridade:", margin + 380, y);
+
+    doc.setTextColor(dark[0], dark[1], dark[2]);
+    doc.setFont("helvetica", "normal");
+    doc.text(projectType || "-", margin + 50, y);
+    doc.text(typology || "-", margin + 210, y);
+    doc.text(area ? `${area} m²` : "-", margin + 320, y);
+
+    const priorityShort = priorityLabels[priority] || "-";
+    const priorityLines = doc.splitTextToSize(priorityShort, 130);
+    doc.text(priorityLines, margin + 435, y);
+
+    y += 12 * priorityLines.length + 10;
+
+    doc.setDrawColor(220, 220, 220);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 18;
+
+    // ================= TABELA DE EQUIPAMENTOS =================
+    const colWidths = {
+      desc: contentWidth * 0.42,
+      cod: contentWidth * 0.12,
+      qt: contentWidth * 0.08,
+      pot: contentWidth * 0.14,
+      tipo: contentWidth * 0.10,
+      total: contentWidth * 0.14,
+    };
+
+    const colX = {
+      desc: margin,
+      cod: margin + colWidths.desc,
+      qt: margin + colWidths.desc + colWidths.cod,
+      pot:
+        margin + colWidths.desc + colWidths.cod + colWidths.qt,
+      tipo:
+        margin +
+        colWidths.desc +
+        colWidths.cod +
+        colWidths.qt +
+        colWidths.pot,
+      total:
+        margin +
+        colWidths.desc +
+        colWidths.cod +
+        colWidths.qt +
+        colWidths.pot +
+        colWidths.tipo,
+    };
+
+    // Cabeçalho da tabela
+    doc.setFillColor(dark[0], dark[1], dark[2]);
+    doc.rect(margin, y, contentWidth, 20, "F");
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.text("Descrição", colX.desc + 8, y + 14);
+    doc.text("Cód.", colX.cod + 4, y + 14);
+    doc.text("Qt", colX.qt + 6, y + 14);
+    doc.text("Potência", colX.pot + 4, y + 14);
+    doc.text("Tipo", colX.tipo + 4, y + 14);
+    doc.text("Sub Total", colX.total + 4, y + 14);
+
+    y += 20;
+
+    // Linhas
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+
+    const equipmentRows =
       selectedEquipment.length > 0
         ? selectedEquipment
-            .map(
-              (item) =>
-                `• ${item.name}: ${item.quantity}`
-            )
-            .join("\n")
-        : "Nenhum equipamento especificado";
+        : [
+            {
+              id: "-",
+              name: "Nenhum equipamento especificado",
+              quantity: 0,
+              power: 0,
+            },
+          ];
 
-    const message = `
-☀️ *DIMENCONAMENTO DE SISTEMA SOLAR*
-*INOVAÇÕES SOLARES*
+    let totalPotencia = 0;
 
-━━━━━━━━━━━━━━━━━━
+    equipmentRows.forEach((item, index) => {
+      // Se estiver a chegar ao fim da página, corta a lista
+      if (y > pageHeight - 220) return;
 
-👤 *DADOS DO CLIENTE*
+      if (index % 2 === 0) {
+        doc.setFillColor(248, 250, 252);
+        doc.rect(margin, y, contentWidth, 18, "F");
+      }
 
-Nome: ${name}
-Contacto: ${phone}
+      doc.setDrawColor(230, 230, 230);
+      doc.setLineWidth(0.3);
+      doc.line(margin, y + 18, pageWidth - margin, y + 18);
 
-━━━━━━━━━━━━━━━━━━
+      // Descrição
+      doc.setTextColor(dark[0], dark[1], dark[2]);
+      const nameLines = doc.splitTextToSize(
+        item.name,
+        colWidths.desc - 10
+      );
+      doc.text(nameLines, colX.desc + 8, y + 12);
 
-🏠 *PROJECTO*
+      // Código
+      doc.setTextColor(gray[0], gray[1], gray[2]);
+      doc.text(item.id.slice(0, 6).toUpperCase(), colX.cod + 4, y + 12);
 
-Tipo: ${projectType}
-Tipologia: ${typology || "Não informado"}
-Província: ${province || "Não informado"}
-Área: ${area || "Não informado"} m²
+      // Quantidade
+      doc.text(String(item.quantity), colX.qt + 6, y + 12);
 
-━━━━━━━━━━━━━━━━━━
+      // Potência unitária
+      doc.text(
+        item.quantity > 0 ? `${item.power} W` : "-",
+        colX.pot + 4,
+        y + 12
+      );
 
-⚡ *EQUIPAMENTOS*
+      // Tipo
+      doc.text("Solar", colX.tipo + 4, y + 12);
 
-${equipmentText}
+      // Sub Total (potência × quantidade)
+      const subTotal = item.power * item.quantity;
+      totalPotencia += subTotal;
 
-Total de equipamentos:
-${totalEquipment}
+      doc.setTextColor(dark[0], dark[1], dark[2]);
+      doc.setFont("helvetica", "bold");
+      doc.text(
+        item.quantity > 0
+          ? subTotal >= 1000
+            ? `${(subTotal / 1000).toFixed(2)} kW`
+            : `${subTotal} W`
+          : "-",
+        colX.total + 4,
+        y + 12
+      );
+      doc.setFont("helvetica", "normal");
 
-━━━━━━━━━━━━━━━━━━
+      y += 18;
+    });
 
-🌾 *INFORMAÇÃO AGRÍCOLA*
+    // Linha de fecho da tabela
+    doc.setDrawColor(dark[0], dark[1], dark[2]);
+    doc.setLineWidth(0.8);
+    doc.line(margin, y, pageWidth - margin, y);
 
-Actividade:
-${agriculturalActivity || "Não aplicável"}
+    // Linha de TOTAL da tabela
+    doc.setFillColor(dark[0], dark[1], dark[2]);
+    doc.rect(margin, y, contentWidth, 20, "F");
 
-Potência da bomba:
-${pumpPower ? `${pumpPower} CV` : "Não aplicável"}
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text("TOTAL DE POTÊNCIA INSTALADA", colX.desc + 8, y + 14);
 
-Horas de funcionamento:
-${pumpHours || "Não aplicável"}
+    doc.text(
+      totalPotencia >= 1000
+        ? `${(totalPotencia / 1000).toFixed(2)} kW`
+        : `${totalPotencia} W`,
+      colX.total + 4,
+      y + 14
+    );
 
-━━━━━━━━━━━━━━━━━━
+    y += 24;
 
-🔌 *EDM*
+       // ================= RESUMO =================
+    const summaryWidth = contentWidth * 0.45;
+    const summaryX = pageWidth - margin - summaryWidth;
 
-${edm || "Não informado"}
+    doc.setFillColor(lightGray[0], lightGray[1], lightGray[2]);
+    doc.roundedRect(summaryX, y, summaryWidth, 76, 6, 6, "F");
 
-━━━━━━━━━━━━━━━━━━
+    doc.setTextColor(gray[0], gray[1], gray[2]);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.text("Total de equipamentos:", summaryX + 12, y + 18);
+    doc.text("Potência total instalada:", summaryX + 12, y + 33);
+    doc.text("Consumo / Factura:", summaryX + 12, y + 48);
+    doc.text("Situação EDM:", summaryX + 12, y + 63);
 
-💰 *CONSUMO*
+    doc.setTextColor(dark[0], dark[1], dark[2]);
+    doc.setFont("helvetica", "bold");
+    doc.text(String(totalEquipment), summaryX + summaryWidth - 12, y + 18, {
+      align: "right",
+    });
+    doc.text(
+      totalPotencia >= 1000
+        ? `${(totalPotencia / 1000).toFixed(2)} kW`
+        : `${totalPotencia} W`,
+      summaryX + summaryWidth - 12,
+      y + 33,
+      { align: "right" }
+    );
+    doc.text(
+      consumption
+        ? consumptionType === "kwh"
+          ? `${consumption} kWh`
+          : `${consumption} Mt`
+        : "-",
+      summaryX + summaryWidth - 12,
+      y + 48,
+      { align: "right" }
+    );
+    doc.setFontSize(7.5);
+    const edmLines = doc.splitTextToSize(edm || "-", summaryWidth - 120);
+    doc.text(edmLines, summaryX + summaryWidth - 12, y + 63, {
+      align: "right",
+    });
 
-Tipo:
-${
-  consumptionType === "kwh"
-    ? "Consumo mensal"
-    : consumptionType === "mt"
-    ? "Valor da factura"
-    : "Não informado"
-}
+    y += 88;
 
-Valor:
-${consumption || "Não informado"}
+    // ================= CAIXA ESTIMATIVA + QR =================
+    if (y > pageHeight - 200) {
+      y = pageHeight - 200;
+    }
 
-━━━━━━━━━━━━━━━━━━
+    const boxHeight = 80;
+    doc.setFillColor(30, 64, 175);
+    doc.roundedRect(margin, y, contentWidth, boxHeight, 8, 8, "F");
 
-🎯 *PRIORIDADE*
+    // Sol decorativo
+    doc.setFillColor(yellow[0], yellow[1], yellow[2]);
+    doc.circle(margin + 38, y + boxHeight / 2, 17, "F");
 
-${priority || "Não informado"}
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("ESTIMATIVA DE POTÊNCIA SOLAR", margin + 70, y + 28);
 
-━━━━━━━━━━━━━━━━━━
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.text(
+      "Com base nas informações fornecidas pelo cliente",
+      margin + 70,
+      y + 46
+    );
 
-☀️ *ESTIMATIVA INICIAL*
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(24);
+    doc.text(
+      `${estimatedPower} kW`,
+      pageWidth - margin - 90,
+      y + 50,
+      { align: "right" }
+    );
 
-Potência solar estimada:
-*${estimatedPower} kW*
+    // QR Code dentro da caixa (lado direito)
+    try {
+      const qrData = JSON.stringify({
+        empresa: "Inovacoes Solares, Lda",
+        cliente: name,
+        contacto: phone,
+        projecto: projectType,
+        potencia: `${estimatedPower} kW`,
+        data: new Date().toISOString().slice(0, 10),
+      });
 
-⚠️ Esta é uma estimativa preliminar.
-O dimensionamento técnico final deverá ser realizado pela equipa da Inovações Solares.
+      const qrDataUrl = await QRCode.toDataURL(qrData, {
+        width: 200,
+        margin: 1,
+        color: { dark: "#0f172a", light: "#ffffff" },
+      });
 
-Gostaria de receber uma proposta personalizada.
-`.trim();
+      doc.addImage(
+        qrDataUrl,
+        "PNG",
+        pageWidth - margin - 72,
+        y + 6,
+        68,
+        68
+      );
+    } catch {
+      // silencioso
+    }
 
-    const whatsapp =
-      "258841138173";
+    y += boxHeight + 14;
 
-    const url =
-      `https://wa.me/${whatsapp}?text=` +
-      encodeURIComponent(message);
+    // ================= NOTAS =================
+    doc.setTextColor(gray[0], gray[1], gray[2]);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text("Notas:", margin, y);
+    y += 12;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    const notes = doc.splitTextToSize(
+      "Esta é uma estimativa preliminar e não substitui o dimensionamento técnico. " +
+        "A equipa da Inovações Solares deverá analisar as cargas, horários de funcionamento, " +
+        "potência de arranque, baterias, painéis e demais condições do projecto. " +
+        "Os valores apresentados servem apenas como referência inicial.",
+      contentWidth
+    );
+    doc.text(notes, margin, y);
+
+    // ================= RODAPÉ =================
+    doc.setDrawColor(blue[0], blue[1], blue[2]);
+    doc.setLineWidth(1);
+    doc.line(margin, pageHeight - 40, pageWidth - margin, pageHeight - 40);
+
+    doc.setTextColor(gray[0], gray[1], gray[2]);
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(7.5);
+    doc.text("Processado por computador", margin, pageHeight - 25);
+
+    doc.text(
+      "Licença número 92/DAF2/2023",
+      pageWidth - margin,
+      pageHeight - 25,
+      { align: "right" }
+    );
+
+    // ================= GUARDAR =================
+    const safeName = name
+      .trim()
+      .replace(/\s+/g, "_")
+      .replace(/[^\w-]/g, "");
+
+    doc.save(`Diagnostico_Solar_${safeName || "Cliente"}.pdf`);
 
     setSubmitted(true);
-
-    window.open(url, "_blank");
   }
 
- const inputClass =
-  "w-full rounded-xl border border-white/10 bg-[#0f172a] px-4 py-3 text-white placeholder:text-gray-500 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500";
+  const inputClass =
+    "w-full rounded-xl border border-white/10 bg-[#0f172a] px-4 py-3 text-white placeholder:text-gray-500 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500";
   const optionClass =
     "rounded-xl border border-white/10 bg-white/5 p-4 text-left transition hover:border-blue-500/60 hover:bg-blue-500/10";
 
@@ -489,7 +831,7 @@ Gostaria de receber uma proposta personalizada.
             <div className="grid gap-5 md:grid-cols-3">
 
               <div>
-                <label className="mb-2 block text-sm text-gray-900">
+                <label className="mb-2 block text-sm text-gray-400">
                   Tipologia
                 </label>
 
@@ -1214,16 +1556,16 @@ Gostaria de receber uma proposta personalizada.
 
             </div>
 
-            {/* BOTÃO WHATSAPP */}
+            {/* BOTÃO PDF */}
             <button
               type="button"
-              onClick={sendWhatsApp}
-              className="mt-6 flex w-full items-center justify-center gap-3 rounded-2xl bg-green-600 px-6 py-4 text-lg font-bold text-white shadow-xl shadow-green-900/20 transition hover:bg-green-500"
+              onClick={generatePDF}
+              className="mt-6 flex w-full items-center justify-center gap-3 rounded-2xl bg-blue-600 px-6 py-4 text-lg font-bold text-white shadow-xl shadow-blue-900/20 transition hover:bg-blue-500"
             >
 
-              <MessageCircle size={25} />
+              <FileDown size={25} />
 
-              Enviar diagnóstico pelo WhatsApp
+              Baixar diagnóstico em PDF
 
             </button>
 
@@ -1231,7 +1573,7 @@ Gostaria de receber uma proposta personalizada.
               <div className="mt-4 flex items-center justify-center gap-2 text-sm text-green-400">
                 <CheckCircle2 size={18} />
 
-                Diagnóstico preparado para envio.
+                Diagnóstico gerado com sucesso.
               </div>
             )}
 
