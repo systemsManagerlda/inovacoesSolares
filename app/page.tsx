@@ -6,6 +6,7 @@ import Newsletter from '@/components/sections/Newsletter'
 import Skeleton from '@/components/ui/Skeleton'
 import { Sun, Sparkles } from 'lucide-react'
 import ImageSlider from '@/components/sections/ImageSlider'
+import SolarDiagnosisForm from '@/components/sections/SolarDiagnosisForm'
 
 // Posições fixas para partículas de luz
 const lightParticles = [
@@ -113,7 +114,7 @@ export default function HomePage() {
           </Suspense>
         </div>
       </section>
- {/* Image Slider */}
+      {/* Image Slider */}
       <div className="relative z-10">
         <ImageSlider />
       </div>
