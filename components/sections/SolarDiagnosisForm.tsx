@@ -105,18 +105,21 @@ export default function SolarDiagnosisForm() {
   const [projectType, setProjectType] = useState("");
   const [typology, setTypology] = useState("");
   const [province, setProvince] = useState("");
-  const [area, setArea] = useState("");
+  const [roofType, setRoofType] = useState("");
+  const [manualLoad, setManualLoad] = useState("");
 
   const [equipment, setEquipment] = useState<Equipment[]>([]);
 
   const [edm, setEdm] = useState("");
+  const [edmPhase, setEdmPhase] = useState("");
   const [consumptionType, setConsumptionType] = useState("");
   const [consumption, setConsumption] = useState("");
 
   const [priority, setPriority] = useState("");
+  const [commercialManager, setCommercialManager] = useState("");
+  const [batteries, setBatteries] = useState("");
 
-  const [agriculturalActivity, setAgriculturalActivity] =
-    useState("");
+  const [agriculturalActivity, setAgriculturalActivity] = useState("");
 
   const [pumpPower, setPumpPower] = useState("");
   const [pumpHours, setPumpHours] = useState("");
@@ -172,10 +175,7 @@ export default function SolarDiagnosisForm() {
         item.id === id
           ? {
               ...item,
-              quantity: Math.max(
-                0,
-                item.quantity + amount
-              ),
+              quantity: Math.max(0, item.quantity + amount),
             }
           : item
       )
@@ -191,52 +191,84 @@ export default function SolarDiagnosisForm() {
     [equipment]
   );
 
-  /*
-   * Estimativa preliminar.
+    /**
+   * Soma da potência real de todos os equipamentos seleccionados
+   * (potência unitária × quantidade), em Watts.
+   */
+  const totalPotenciaInstalada = useMemo(
+    () =>
+      equipment.reduce(
+        (total, item) => total + item.power * item.quantity,
+        0
+      ),
+    [equipment]
+  );
+
+  /**
+   * Estimativa preliminar de potência solar.
    *
-   * IMPORTANTE:
-   * Não substitui o dimensionamento técnico.
+   * Lógica:
+   *  1. Base = potência real instalada × factor de simultaneidade
+   *  2. Aplica piso mínimo de 3 kW
+   *  3. Se o consumo informado exigir mais, esse prevalece
+   *  4. Ajustes de prioridade e agrícola
+   *  5. Arredonda sempre para cima
+   *
+   * IMPORTANTE: não substitui o dimensionamento técnico.
    */
   const estimatedPower = useMemo(() => {
-    let power = 3;
+    // 1) Potência real instalada (W → kW)
+    const potenciaInstaladaKW = totalPotenciaInstalada / 1000;
 
-    const value = Number(
-      consumption.replace(",", ".")
-    );
+    // Factor de simultaneidade: nem todos os equipamentos
+    // funcionam ao mesmo tempo a 100%.
+    const fatorSimultaneidade = 0.7;
+
+    let power = potenciaInstaladaKW * fatorSimultaneidade;
+
+    // 2) Piso mínimo de segurança
+    if (power < 3) power = 3;
+
+    // 3) Consumo informado — se exigir mais, prevalece
+    const value = Number(consumption.replace(",", "."));
 
     if (consumptionType === "kwh") {
-      if (value <= 150) power = 3;
-      else if (value <= 300) power = 5;
-      else if (value <= 500) power = 8;
-      else if (value <= 700) power = 10;
-      else if (value <= 1000) power = 12;
-      else if (value <= 1500) power = 15;
-      else if (value <= 2000) power = 20;
-      else power = 30;
+      let porConsumo = 0;
+
+      if (value <= 150) porConsumo = 3;
+      else if (value <= 300) porConsumo = 5;
+      else if (value <= 500) porConsumo = 8;
+      else if (value <= 700) porConsumo = 10;
+      else if (value <= 1000) porConsumo = 12;
+      else if (value <= 1500) porConsumo = 15;
+      else if (value <= 2000) porConsumo = 20;
+      else if (value > 2000) porConsumo = 30;
+
+      if (porConsumo > power) power = porConsumo;
     }
 
     if (consumptionType === "mt") {
-      if (value <= 2500) power = 3;
-      else if (value <= 5000) power = 5;
-      else if (value <= 8000) power = 8;
-      else if (value <= 12000) power = 10;
-      else if (value <= 18000) power = 12;
-      else if (value <= 25000) power = 15;
-      else if (value <= 35000) power = 20;
-      else power = 30;
+      let porConsumo = 0;
+
+      if (value <= 2500) porConsumo = 3;
+      else if (value <= 5000) porConsumo = 5;
+      else if (value <= 8000) porConsumo = 8;
+      else if (value <= 12000) porConsumo = 10;
+      else if (value <= 18000) porConsumo = 12;
+      else if (value <= 25000) porConsumo = 15;
+      else if (value <= 35000) porConsumo = 20;
+      else if (value > 35000) porConsumo = 30;
+
+      if (porConsumo > power) power = porConsumo;
     }
 
-    if (totalEquipment >= 8) power += 2;
-    if (totalEquipment >= 14) power += 3;
-
-    if (priority.includes("autonomia")) {
+    // 4) Ajustes por prioridade
+    if (priority === "backup" || priority === "toda-casa") {
       power += 2;
     }
 
-    if (
-      projectType === "agricola" &&
-      pumpPower
-    ) {
+    // 5) Ajuste agrícola (bomba)
+    if (projectType === "agricola" && pumpPower) {
       const cv = Number(pumpPower);
 
       if (cv >= 5) power += 3;
@@ -244,21 +276,22 @@ export default function SolarDiagnosisForm() {
       if (cv >= 15) power += 8;
     }
 
-    return power;
+    // 6) Arredonda sempre para cima
+    return Math.ceil(power);
   }, [
+    totalPotenciaInstalada,
     consumption,
     consumptionType,
-    totalEquipment,
     priority,
     projectType,
     pumpPower,
   ]);
-
+  
   const selectedEquipment = equipment.filter(
     (item) => item.quantity > 0
   );
 
-      async function generatePDF() {
+  async function generatePDF() {
     if (!name || !phone) {
       alert("Por favor, indique o seu nome e contacto.");
       return;
@@ -270,15 +303,11 @@ export default function SolarDiagnosisForm() {
     }
 
     const priorityLabels: Record<string, string> = {
-      "reducao-factura": "Reduzir a factura da EDM",
-      cortes: "Ter energia durante cortes",
-      autonomia: "Ter maior autonomia energética",
-      bombas: "Alimentar bombas de água",
-      irrigacao: "Irrigação agrícola",
-      gerador: "Substituir gerador",
-      negocio: "Proteger o meu negócio",
-      custos: "Reduzir custos operacionais",
-      sustentabilidade: "Energia limpa e sustentável",
+      "reducao-custos": "Reduzir custos com a EDM",
+      "principais-electrodomesticos":
+        "Alimentar os principais electrodomésticos",
+      backup: "Ter um sistema de backup",
+      "toda-casa": "Alimentar toda a casa sem restrição",
     };
 
     const doc = new jsPDF({ unit: "pt", format: "a4" });
@@ -288,7 +317,6 @@ export default function SolarDiagnosisForm() {
     const margin = 40;
     const contentWidth = pageWidth - margin * 2;
 
-    // ---------- CORES ----------
     const dark = [15, 23, 42] as const;
     const blue = [37, 99, 235] as const;
     const yellow = [250, 204, 21] as const;
@@ -296,7 +324,6 @@ export default function SolarDiagnosisForm() {
     const lightGray = [241, 245, 249] as const;
 
     // ================= CABEÇALHO =================
-    // Logo
     try {
       const logoData = await fetch("/logo.png").then((r) => r.blob());
       const logoBase64: string = await new Promise((resolve) => {
@@ -309,7 +336,6 @@ export default function SolarDiagnosisForm() {
       // sem logo, não bloqueia
     }
 
-    // Nome + dados da empresa
     doc.setTextColor(blue[0], blue[1], blue[2]);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
@@ -324,18 +350,13 @@ export default function SolarDiagnosisForm() {
       52
     );
     doc.text("NUIT: 401143025", margin + 80, 64);
-    doc.text(
-      "Email: inovacoessolares@gmail.com",
-      margin + 80,
-      76
-    );
+    doc.text("Email: inovacoessolares@gmail.com", margin + 80, 76);
     doc.text(
       "Telefone: (+258) 84 113 8173 | (+258) 87 113 8173",
       margin + 80,
       88
     );
 
-    // Linha separadora
     doc.setDrawColor(blue[0], blue[1], blue[2]);
     doc.setLineWidth(1.5);
     doc.line(margin, 102, pageWidth - margin, 102);
@@ -362,7 +383,6 @@ export default function SolarDiagnosisForm() {
       y + 45
     );
 
-    // Título
     doc.setTextColor(dark[0], dark[1], dark[2]);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
@@ -382,31 +402,78 @@ export default function SolarDiagnosisForm() {
 
     y += 70;
 
-    // ================= INFO PROJECTO =================
+        // ================= INFO PROJECTO =================
     doc.setDrawColor(220, 220, 220);
     doc.setLineWidth(0.5);
     doc.line(margin, y, pageWidth - margin, y);
     y += 16;
 
+    // --- Linha 1: Projecto | Tipologia | Prioridade ---
     doc.setTextColor(gray[0], gray[1], gray[2]);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8.5);
     doc.text("Projecto:", margin, y);
-    doc.text("Tipologia:", margin + 160, y);
-    doc.text("Área:", margin + 290, y);
-    doc.text("Prioridade:", margin + 380, y);
+    doc.text("Tipologia:", margin + 200, y);
+    doc.text("Prioridade:", margin + 360, y);
 
     doc.setTextColor(dark[0], dark[1], dark[2]);
     doc.setFont("helvetica", "normal");
     doc.text(projectType || "-", margin + 50, y);
-    doc.text(typology || "-", margin + 210, y);
-    doc.text(area ? `${area} m²` : "-", margin + 320, y);
+    doc.text(typology || "-", margin + 250, y);
 
     const priorityShort = priorityLabels[priority] || "-";
-    const priorityLines = doc.splitTextToSize(priorityShort, 130);
-    doc.text(priorityLines, margin + 435, y);
+    const priorityLines = doc.splitTextToSize(priorityShort, 160);
+    doc.text(priorityLines, margin + 410, y);
 
-    y += 12 * priorityLines.length + 10;
+    y += 12 * Math.max(1, priorityLines.length) + 6;
+
+    // --- Linha 2: Cobertura | EDM | Baixa | Baterias ---
+    doc.setTextColor(gray[0], gray[1], gray[2]);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.text("Cobertura:", margin, y);
+    doc.text("EDM:", margin + 150, y);
+    doc.text("Baixa:", margin + 285, y);
+    doc.text("Baterias:", margin + 390, y);
+
+    doc.setTextColor(dark[0], dark[1], dark[2]);
+    doc.setFont("helvetica", "normal");
+    doc.text(roofType || "-", margin + 60, y);
+    doc.text(edm || "-", margin + 180, y);
+    doc.text(edmPhase || "-", margin + 320, y);
+    doc.text(batteries || "-", margin + 440, y);
+
+    y += 16;
+
+    // --- Bloco agrícola (só quando aplicável) ---
+    if (projectType === "agricola") {
+      doc.setDrawColor(220, 220, 220);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 14;
+
+      doc.setTextColor(gray[0], gray[1], gray[2]);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.text("Actividade agrícola:", margin, y);
+      doc.text("Bomba:", margin + 200, y);
+      doc.text("Horas/dia:", margin + 300, y);
+
+      doc.setTextColor(dark[0], dark[1], dark[2]);
+      doc.setFont("helvetica", "normal");
+      doc.text(agriculturalActivity || "-", margin + 95, y);
+      doc.text(
+        pumpPower
+          ? pumpPower === "nao-sei"
+            ? "Não sei"
+            : `${pumpPower} CV`
+          : "-",
+        margin + 245,
+        y
+      );
+      doc.text(pumpHours || "-", margin + 355, y);
+
+      y += 14;
+    }
 
     doc.setDrawColor(220, 220, 220);
     doc.line(margin, y, pageWidth - margin, y);
@@ -426,8 +493,7 @@ export default function SolarDiagnosisForm() {
       desc: margin,
       cod: margin + colWidths.desc,
       qt: margin + colWidths.desc + colWidths.cod,
-      pot:
-        margin + colWidths.desc + colWidths.cod + colWidths.qt,
+      pot: margin + colWidths.desc + colWidths.cod + colWidths.qt,
       tipo:
         margin +
         colWidths.desc +
@@ -443,7 +509,6 @@ export default function SolarDiagnosisForm() {
         colWidths.tipo,
     };
 
-    // Cabeçalho da tabela
     doc.setFillColor(dark[0], dark[1], dark[2]);
     doc.rect(margin, y, contentWidth, 20, "F");
 
@@ -459,7 +524,6 @@ export default function SolarDiagnosisForm() {
 
     y += 20;
 
-    // Linhas
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
 
@@ -478,7 +542,6 @@ export default function SolarDiagnosisForm() {
     let totalPotencia = 0;
 
     equipmentRows.forEach((item, index) => {
-      // Se estiver a chegar ao fim da página, corta a lista
       if (y > pageHeight - 220) return;
 
       if (index % 2 === 0) {
@@ -490,7 +553,6 @@ export default function SolarDiagnosisForm() {
       doc.setLineWidth(0.3);
       doc.line(margin, y + 18, pageWidth - margin, y + 18);
 
-      // Descrição
       doc.setTextColor(dark[0], dark[1], dark[2]);
       const nameLines = doc.splitTextToSize(
         item.name,
@@ -498,24 +560,16 @@ export default function SolarDiagnosisForm() {
       );
       doc.text(nameLines, colX.desc + 8, y + 12);
 
-      // Código
       doc.setTextColor(gray[0], gray[1], gray[2]);
       doc.text(item.id.slice(0, 6).toUpperCase(), colX.cod + 4, y + 12);
-
-      // Quantidade
       doc.text(String(item.quantity), colX.qt + 6, y + 12);
-
-      // Potência unitária
       doc.text(
         item.quantity > 0 ? `${item.power} W` : "-",
         colX.pot + 4,
         y + 12
       );
-
-      // Tipo
       doc.text("Solar", colX.tipo + 4, y + 12);
 
-      // Sub Total (potência × quantidade)
       const subTotal = item.power * item.quantity;
       totalPotencia += subTotal;
 
@@ -535,12 +589,10 @@ export default function SolarDiagnosisForm() {
       y += 18;
     });
 
-    // Linha de fecho da tabela
     doc.setDrawColor(dark[0], dark[1], dark[2]);
     doc.setLineWidth(0.8);
     doc.line(margin, y, pageWidth - margin, y);
 
-    // Linha de TOTAL da tabela
     doc.setFillColor(dark[0], dark[1], dark[2]);
     doc.rect(margin, y, contentWidth, 20, "F");
 
@@ -559,7 +611,7 @@ export default function SolarDiagnosisForm() {
 
     y += 24;
 
-       // ================= RESUMO =================
+    // ================= RESUMO =================
     const summaryWidth = contentWidth * 0.45;
     const summaryX = pageWidth - margin - summaryWidth;
 
@@ -606,15 +658,16 @@ export default function SolarDiagnosisForm() {
     y += 88;
 
     // ================= CAIXA ESTIMATIVA + QR =================
-    if (y > pageHeight - 200) {
-      y = pageHeight - 200;
+    const boxHeight = 80;
+
+    // Se não houver espaço suficiente, força a posição a uma zona segura
+    if (y + boxHeight + 60 > pageHeight - 40) {
+      y = pageHeight - 40 - boxHeight - 60;
     }
 
-    const boxHeight = 80;
     doc.setFillColor(30, 64, 175);
     doc.roundedRect(margin, y, contentWidth, boxHeight, 8, 8, "F");
 
-    // Sol decorativo
     doc.setFillColor(yellow[0], yellow[1], yellow[2]);
     doc.circle(margin + 38, y + boxHeight / 2, 17, "F");
 
@@ -633,12 +686,9 @@ export default function SolarDiagnosisForm() {
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(24);
-    doc.text(
-      `${estimatedPower} kW`,
-      pageWidth - margin - 90,
-      y + 50,
-      { align: "right" }
-    );
+    doc.text(`${estimatedPower} kW`, pageWidth - margin - 90, y + 50, {
+      align: "right",
+    });
 
     // QR Code dentro da caixa (lado direito)
     try {
@@ -647,6 +697,11 @@ export default function SolarDiagnosisForm() {
         cliente: name,
         contacto: phone,
         projecto: projectType,
+        cobertura: roofType,
+        edm: edm,
+        baixa: edmPhase,
+        baterias: batteries,
+        gestor: commercialManager,
         potencia: `${estimatedPower} kW`,
         data: new Date().toISOString().slice(0, 10),
       });
@@ -670,6 +725,37 @@ export default function SolarDiagnosisForm() {
     }
 
     y += boxHeight + 14;
+
+    // ================= DADOS ADICIONAIS =================
+    if (manualLoad || commercialManager) {
+      doc.setTextColor(gray[0], gray[1], gray[2]);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+
+      if (manualLoad) {
+        doc.text("Carga indicada manualmente:", margin, y);
+        y += 12;
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        const manualLoadLines = doc.splitTextToSize(
+          manualLoad,
+          contentWidth
+        );
+        doc.text(manualLoadLines, margin, y);
+        y += 12 * manualLoadLines.length + 8;
+      }
+
+      if (commercialManager) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.text("Gestor comercial:", margin, y);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.text(commercialManager, margin + 90, y);
+        y += 18;
+      }
+    }
 
     // ================= NOTAS =================
     doc.setTextColor(gray[0], gray[1], gray[2]);
@@ -776,16 +862,13 @@ export default function SolarDiagnosisForm() {
               {typeOptions.map((option) => {
                 const Icon = option.icon;
 
-                const active =
-                  projectType === option.id;
+                const active = projectType === option.id;
 
                 return (
                   <button
                     key={option.id}
                     type="button"
-                    onClick={() =>
-                      selectProjectType(option.id)
-                    }
+                    onClick={() => selectProjectType(option.id)}
                     className={`rounded-2xl border p-5 text-left transition ${
                       active
                         ? "border-blue-500 bg-blue-500/15 shadow-lg shadow-blue-500/10"
@@ -795,9 +878,7 @@ export default function SolarDiagnosisForm() {
                     <Icon
                       size={30}
                       className={
-                        active
-                          ? "text-blue-400"
-                          : "text-gray-400"
+                        active ? "text-blue-400" : "text-gray-400"
                       }
                     />
 
@@ -828,7 +909,7 @@ export default function SolarDiagnosisForm() {
               </h2>
             </div>
 
-            <div className="grid gap-5 md:grid-cols-3">
+            <div className="grid gap-5 md:grid-cols-2">
 
               <div>
                 <label className="mb-2 block text-sm text-gray-400">
@@ -837,52 +918,18 @@ export default function SolarDiagnosisForm() {
 
                 <select
                   value={typology}
-                  onChange={(e) =>
-                    setTypology(e.target.value)
-                  }
+                  onChange={(e) => setTypology(e.target.value)}
                   className={inputClass}
                 >
-                  <option value="">
-                    Seleccione
-                  </option>
-                  <option value="T0">
-                    T0
-                  </option>
-                  <option value="T1">
-                    T1
-                  </option>
-                  <option value="T2">
-                    T2
-                  </option>
-                  <option value="T3">
-                    T3
-                  </option>
-                  <option value="T4">
-                    T4
-                  </option>
-                  <option value="T5+">
-                    T5+
-                  </option>
-                  <option value="Não se aplica">
-                    Não se aplica
-                  </option>
+                  <option value="">Seleccione</option>
+                  <option value="T0">T0</option>
+                  <option value="T1">T1</option>
+                  <option value="T2">T2</option>
+                  <option value="T3">T3</option>
+                  <option value="T4">T4</option>
+                  <option value="T5+">T5+</option>
+                  <option value="Não se aplica">Não se aplica</option>
                 </select>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm text-gray-400">
-                  Área aproximada (m²)
-                </label>
-
-                <input
-                  type="number"
-                  value={area}
-                  onChange={(e) =>
-                    setArea(e.target.value)
-                  }
-                  placeholder="Ex.: 250"
-                  className={inputClass}
-                />
               </div>
 
               <div>
@@ -892,14 +939,10 @@ export default function SolarDiagnosisForm() {
 
                 <select
                   value={province}
-                  onChange={(e) =>
-                    setProvince(e.target.value)
-                  }
+                  onChange={(e) => setProvince(e.target.value)}
                   className={inputClass}
                 >
-                  <option value="">
-                    Seleccione
-                  </option>
+                  <option value="">Seleccione</option>
                   <option>Maputo</option>
                   <option>Maputo Cidade</option>
                   <option>Gaza</option>
@@ -915,6 +958,25 @@ export default function SolarDiagnosisForm() {
               </div>
 
             </div>
+
+            <div className="mt-5">
+              <label className="mb-2 block text-sm text-gray-400">
+                Tipo de cobertura
+              </label>
+
+              <select
+                value={roofType}
+                onChange={(e) => setRoofType(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">Seleccione</option>
+                <option value="Laje">Laje</option>
+                <option value="Chapa IBR">Chapa IBR</option>
+                <option value="Chapa ondulada">Chapa ondulada</option>
+                <option value="Telhas">Telhas</option>
+              </select>
+            </div>
+
           </section>
 
           {/* 3 - EQUIPAMENTOS */}
@@ -936,6 +998,24 @@ export default function SolarDiagnosisForm() {
                 </p>
               </div>
 
+              <div className="mb-6">
+                <label className="mb-2 block text-sm text-gray-400">
+                  Espaço para colocar carga manualmente
+                </label>
+
+                <textarea
+                  value={manualLoad}
+                  onChange={(e) => setManualLoad(e.target.value)}
+                  placeholder="Ex.: 2 ar condicionados de 12.000 BTU, bomba de 5 CV, motor de 3 kW..."
+                  rows={3}
+                  className={inputClass}
+                />
+
+                <p className="mt-2 text-xs text-gray-500">
+                  Utilize este espaço para indicar equipamentos ou cargas que não aparecem na lista.
+                </p>
+              </div>
+
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 
                 {equipment.map((item) => (
@@ -953,12 +1033,7 @@ export default function SolarDiagnosisForm() {
 
                       <button
                         type="button"
-                        onClick={() =>
-                          updateQuantity(
-                            item.id,
-                            -1
-                          )
-                        }
+                        onClick={() => updateQuantity(item.id, -1)}
                         className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 hover:bg-white/20"
                       >
                         <Minus size={15} />
@@ -970,12 +1045,7 @@ export default function SolarDiagnosisForm() {
 
                       <button
                         type="button"
-                        onClick={() =>
-                          updateQuantity(
-                            item.id,
-                            1
-                          )
-                        }
+                        onClick={() => updateQuantity(item.id, 1)}
                         className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-500"
                       >
                         <Plus size={15} />
@@ -990,13 +1060,9 @@ export default function SolarDiagnosisForm() {
               </div>
 
               <div className="mt-5 flex items-center gap-2 text-sm text-gray-400">
-                <CheckCircle2
-                  size={17}
-                  className="text-blue-400"
-                />
+                <CheckCircle2 size={17} className="text-blue-400" />
 
-                {totalEquipment} equipamento(s)
-                seleccionado(s)
+                {totalEquipment} equipamento(s) seleccionado(s)
               </div>
 
             </section>
@@ -1009,10 +1075,7 @@ export default function SolarDiagnosisForm() {
               <div className="mb-6 flex items-start gap-4">
 
                 <div className="rounded-xl bg-green-500/10 p-3">
-                  <Sprout
-                    className="text-green-400"
-                    size={28}
-                  />
+                  <Sprout className="text-green-400" size={28} />
                 </div>
 
                 <div>
@@ -1055,9 +1118,7 @@ export default function SolarDiagnosisForm() {
                     <button
                       key={item}
                       type="button"
-                      onClick={() =>
-                        setAgriculturalActivity(item)
-                      }
+                      onClick={() => setAgriculturalActivity(item)}
                       className={`rounded-xl border p-4 text-left text-sm transition ${
                         agriculturalActivity === item
                           ? "border-green-500 bg-green-500/10"
@@ -1082,44 +1143,20 @@ export default function SolarDiagnosisForm() {
 
                   <select
                     value={pumpPower}
-                    onChange={(e) =>
-                      setPumpPower(e.target.value)
-                    }
+                    onChange={(e) => setPumpPower(e.target.value)}
                     className={inputClass}
                   >
-                    <option value="">
-                      Seleccione
-                    </option>
-                    <option value="1">
-                      1 CV
-                    </option>
-                    <option value="2">
-                      2 CV
-                    </option>
-                    <option value="3">
-                      3 CV
-                    </option>
-                    <option value="5">
-                      5 CV
-                    </option>
-                    <option value="7.5">
-                      7,5 CV
-                    </option>
-                    <option value="10">
-                      10 CV
-                    </option>
-                    <option value="15">
-                      15 CV
-                    </option>
-                    <option value="20">
-                      20 CV
-                    </option>
-                    <option value="25">
-                      25 CV ou mais
-                    </option>
-                    <option value="nao-sei">
-                      Não sei
-                    </option>
+                    <option value="">Seleccione</option>
+                    <option value="1">1 CV</option>
+                    <option value="2">2 CV</option>
+                    <option value="3">3 CV</option>
+                    <option value="5">5 CV</option>
+                    <option value="7.5">7,5 CV</option>
+                    <option value="10">10 CV</option>
+                    <option value="15">15 CV</option>
+                    <option value="20">20 CV</option>
+                    <option value="25">25 CV ou mais</option>
+                    <option value="nao-sei">Não sei</option>
                   </select>
                 </div>
 
@@ -1130,29 +1167,15 @@ export default function SolarDiagnosisForm() {
 
                   <select
                     value={pumpHours}
-                    onChange={(e) =>
-                      setPumpHours(e.target.value)
-                    }
+                    onChange={(e) => setPumpHours(e.target.value)}
                     className={inputClass}
                   >
-                    <option value="">
-                      Seleccione
-                    </option>
-                    <option>
-                      Menos de 2 horas
-                    </option>
-                    <option>
-                      2–4 horas
-                    </option>
-                    <option>
-                      4–6 horas
-                    </option>
-                    <option>
-                      6–8 horas
-                    </option>
-                    <option>
-                      Mais de 8 horas
-                    </option>
+                    <option value="">Seleccione</option>
+                    <option>Menos de 2 horas</option>
+                    <option>2–4 horas</option>
+                    <option>4–6 horas</option>
+                    <option>6–8 horas</option>
+                    <option>Mais de 8 horas</option>
                   </select>
                 </div>
 
@@ -1213,6 +1236,22 @@ export default function SolarDiagnosisForm() {
 
             </div>
 
+            <div className="mt-6">
+              <label className="mb-2 block text-sm text-gray-400">
+                04.1 — Tipo de baixa tensão
+              </label>
+
+              <select
+                value={edmPhase}
+                onChange={(e) => setEdmPhase(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">Seleccione</option>
+                <option value="Monofásica">Monofásica</option>
+                <option value="Trifásica">Trifásica</option>
+              </select>
+            </div>
+
           </section>
 
           {/* 6 - CONSUMO */}
@@ -1237,9 +1276,7 @@ export default function SolarDiagnosisForm() {
 
               <button
                 type="button"
-                onClick={() =>
-                  setConsumptionType("kwh")
-                }
+                onClick={() => setConsumptionType("kwh")}
                 className={`${optionClass} ${
                   consumptionType === "kwh"
                     ? "border-blue-500 bg-blue-500/15"
@@ -1251,9 +1288,7 @@ export default function SolarDiagnosisForm() {
 
               <button
                 type="button"
-                onClick={() =>
-                  setConsumptionType("mt")
-                }
+                onClick={() => setConsumptionType("mt")}
                 className={`${optionClass} ${
                   consumptionType === "mt"
                     ? "border-blue-500 bg-blue-500/15"
@@ -1271,9 +1306,7 @@ export default function SolarDiagnosisForm() {
                 <input
                   type="number"
                   value={consumption}
-                  onChange={(e) =>
-                    setConsumption(e.target.value)
-                  }
+                  onChange={(e) => setConsumption(e.target.value)}
                   placeholder={
                     consumptionType === "kwh"
                       ? "Ex.: 500"
@@ -1309,49 +1342,24 @@ export default function SolarDiagnosisForm() {
 
               {[
                 {
-                  id: "reducao-factura",
-                  text: "Reduzir a factura da EDM",
+                  id: "reducao-custos",
+                  text: "Reduzir custos com a EDM",
                   icon: "💰",
                 },
                 {
-                  id: "cortes",
-                  text: "Ter energia durante cortes",
-                  icon: "🔋",
-                },
-                {
-                  id: "autonomia",
-                  text: "Ter maior autonomia energética",
+                  id: "principais-electrodomesticos",
+                  text: "Alimentar os principais electrodomésticos",
                   icon: "⚡",
                 },
                 {
-                  id: "bombas",
-                  text: "Alimentar bombas de água",
-                  icon: "💧",
+                  id: "backup",
+                  text: "Ter um sistema de backup",
+                  icon: "🔋",
                 },
                 {
-                  id: "irrigacao",
-                  text: "Irrigação agrícola",
-                  icon: "🌱",
-                },
-                {
-                  id: "gerador",
-                  text: "Substituir gerador",
-                  icon: "🔌",
-                },
-                {
-                  id: "negocio",
-                  text: "Proteger o meu negócio",
-                  icon: "🏢",
-                },
-                {
-                  id: "custos",
-                  text: "Reduzir custos operacionais",
-                  icon: "📉",
-                },
-                {
-                  id: "sustentabilidade",
-                  text: "Energia limpa e sustentável",
-                  icon: "☀️",
+                  id: "toda-casa",
+                  text: "Alimentar toda a casa sem restrição",
+                  icon: "🏠",
                 },
               ].map((item) => {
 
@@ -1377,7 +1385,6 @@ export default function SolarDiagnosisForm() {
                     `}
                   >
 
-                    {/* Indicador de selecção */}
                     <div
                       className={`
                         mr-4 flex h-7 w-7 flex-shrink-0
@@ -1398,12 +1405,10 @@ export default function SolarDiagnosisForm() {
                       )}
                     </div>
 
-                    {/* Ícone */}
                     <span className="mr-3 text-2xl">
                       {item.icon}
                     </span>
 
-                    {/* Texto */}
                     <span
                       className={`
                         text-sm font-medium
@@ -1423,53 +1428,30 @@ export default function SolarDiagnosisForm() {
 
             </div>
 
-            {/* Opção seleccionada */}
             {priority && (
               <div className="mt-5 flex items-center gap-2 rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-sm text-blue-300">
                 <CheckCircle2 size={18} />
 
                 <span>
                   Prioridade seleccionada:{" "}
-                  <strong className="text-white">
-                    {
-                      {
-                        "reducao-factura":
-                          "Reduzir a factura da EDM",
-
-                        cortes:
-                          "Ter energia durante cortes",
-
-                        autonomia:
-                          "Ter maior autonomia energética",
-
-                        bombas:
-                          "Alimentar bombas de água",
-
-                        irrigacao:
-                          "Irrigação agrícola",
-
-                        gerador:
-                          "Substituir gerador",
-
-                        negocio:
-                          "Proteger o meu negócio",
-
-                        custos:
-                          "Reduzir custos operacionais",
-
-                        sustentabilidade:
-                          "Energia limpa e sustentável",
-                      }[priority]
-                    }
+                  <strong>
+                    {{
+                      "reducao-custos": "Reduzir custos com a EDM",
+                      "principais-electrodomesticos":
+                        "Alimentar os principais electrodomésticos",
+                      backup: "Ter um sistema de backup",
+                      "toda-casa": "Alimentar toda a casa sem restrição",
+                    }[priority]}
                   </strong>
                 </span>
+
               </div>
             )}
 
           </section>
 
           {/* 8 - CONTACTO */}
-          <section className="p-6 sm:p-8">
+          <section className="border-b border-white/10 p-6 sm:p-8">
 
             <div className="mb-6">
               <span className="text-sm font-medium text-blue-400">
@@ -1495,9 +1477,7 @@ export default function SolarDiagnosisForm() {
 
                 <input
                   value={name}
-                  onChange={(e) =>
-                    setName(e.target.value)
-                  }
+                  onChange={(e) => setName(e.target.value)}
                   placeholder="Seu nome"
                   className={inputClass}
                 />
@@ -1510,9 +1490,7 @@ export default function SolarDiagnosisForm() {
 
                 <input
                   value={phone}
-                  onChange={(e) =>
-                    setPhone(e.target.value)
-                  }
+                  onChange={(e) => setPhone(e.target.value)}
                   placeholder="Ex.: 84 123 4567"
                   className={inputClass}
                 />
@@ -1556,27 +1534,101 @@ export default function SolarDiagnosisForm() {
 
             </div>
 
-            {/* BOTÃO PDF */}
+          </section>
+
+          {/* 8 - GESTOR COMERCIAL */}
+          <section className="border-b border-white/10 p-6 sm:p-8">
+            <div className="mb-6">
+              <span className="text-sm font-medium text-blue-400">
+                08
+              </span>
+
+              <h2 className="mt-1 text-2xl font-bold">
+                Seleccione o gestor comercial
+              </h2>
+
+              <p className="mt-2 text-gray-400">
+                Seleccione o gestor responsável pelo atendimento deste diagnóstico.
+              </p>
+            </div>
+
+            <select
+              value={commercialManager}
+              onChange={(e) => setCommercialManager(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">Seleccione o gestor comercial</option>
+              <option value="Frank Langa">Frank Langa</option>
+              <option value="Valdemar Bembele">Valdemar Bembele</option>
+              <option value="Virgílio Magalhães">Virgílio Magalhães</option>
+            </select>
+
+            <p className="mt-2 text-xs text-gray-500">
+              Seleccione o gestor responsável pelo atendimento deste diagnóstico.
+            </p>
+          </section>
+
+          {/* 9 - BATERIAS */}
+          <section className="border-b border-white/10 p-6 sm:p-8">
+            <div className="mb-6">
+              <span className="text-sm font-medium text-blue-400">
+                09
+              </span>
+
+              <h2 className="mt-1 text-2xl font-bold">
+                Deseja usar baterias?
+              </h2>
+
+              <p className="mt-2 text-gray-400">
+                Indique se pretende incluir armazenamento de energia no sistema.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {["Sim", "Não"].map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setBatteries(item)}
+                  className={`${optionClass} ${
+                    batteries === item
+                      ? "border-blue-500 bg-blue-500/15"
+                      : ""
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <BatteryCharging
+                      size={20}
+                      className={
+                        batteries === item
+                          ? "text-blue-400"
+                          : "text-gray-500"
+                      }
+                    />
+                    {item}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          {/* 10 - BOTÃO PDF */}
+          <section className="p-6 sm:p-8">
             <button
               type="button"
               onClick={generatePDF}
-              className="mt-6 flex w-full items-center justify-center gap-3 rounded-2xl bg-blue-600 px-6 py-4 text-lg font-bold text-white shadow-xl shadow-blue-900/20 transition hover:bg-blue-500"
+              className="flex w-full items-center justify-center gap-3 rounded-2xl bg-blue-600 px-6 py-4 text-lg font-bold text-white shadow-xl shadow-blue-900/20 transition hover:bg-blue-500"
             >
-
               <FileDown size={25} />
-
               Baixar diagnóstico em PDF
-
             </button>
 
             {submitted && (
               <div className="mt-4 flex items-center justify-center gap-2 text-sm text-green-400">
                 <CheckCircle2 size={18} />
-
                 Diagnóstico gerado com sucesso.
               </div>
             )}
-
           </section>
 
         </div>
