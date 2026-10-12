@@ -26,26 +26,13 @@ type Produto = {
   imgSRC?: string
 }
 
-
-type FormProduto = Omit<
-  Produto,
-  | '_id'
-  | 'nomeEmpresa'
-  | 'totalVendido'
-  | 'imgSRC'
-  | 'quantidadeInicial'
-  | 'quantidadeEstoque'
-  | 'stockSeguranca'
-  | 'precoAquisicao'
-  | 'precoVenda'
-> & {
+type FormProduto = Omit<Produto, '_id' | 'nomeEmpresa' | 'totalVendido' | 'imgSRC' | 'quantidadeInicial' | 'quantidadeEstoque' | 'stockSeguranca' | 'precoAquisicao' | 'precoVenda'> & {
   quantidadeInicial: string;
   quantidadeEstoque: string;
   stockSeguranca: string;
   precoAquisicao: string;
   precoVenda: string;
-};
-
+}
 
 const EMPRESA = 'Inovacoes Solares'
 const STOCK_USER = 'INO-1773'
@@ -365,7 +352,7 @@ export default function StockPage() {
         </section>
       </div>
 
-      {showForm && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"><div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-gray-800 bg-gray-950 p-6"><div className="mb-5 flex items-center justify-between"><div><h2 className="text-xl font-bold">{editing ? 'Editar produto' : 'Novo produto'}</h2><p className="mt-1 text-sm text-gray-500">Empresa: {EMPRESA}</p></div><button onClick={() => setShowForm(false)} className="rounded-lg p-2 text-gray-400 hover:bg-gray-800"><X size={20}/></button></div><form onSubmit={saveProduct} className="grid gap-4 sm:grid-cols-2">
+      {showForm && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"><div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-gray-800 bg-gray-950 p-6"><div className="mb-5 flex items-center justify-between"><div><h2 className="text-xl font-bold">{editing ? 'Editar produto' : 'Novo produto'}</h2><p className="mt-1 text-sm text-gray-500">Empresa: {EMPRESA}</p></div><button onClick={() => setShowForm(false)} className="rounded-lg p-2 text-gray-400 hover:bg-gray-800"><X size={20}/></button></div><form onSubmit={saveProduct} className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Nome do produto" required value={form.nomeProduto} onChange={(v) => setForm({...form,nomeProduto:v})}/><Field label="Código do produto" required value={form.codigoProduto} onChange={(v) => setForm({...form,codigoProduto:v})}/><Field label="Categoria" value={form.categoriaNovo || ''} onChange={(v) => setForm({...form,categoriaNovo:v})}/><Field label="Quantidade inicial" type="number" min="0" required value={form.quantidadeInicial} onChange={(v) => setForm({...form,quantidadeInicial:v})}/><Field label="Quantidade actual em stock" type="number" min="0" required value={form.quantidadeEstoque} onChange={(v) => setForm({...form,quantidadeEstoque:v})}/><Field label="Stock de segurança" type="number" min="0" required value={form.stockSeguranca} onChange={(v) => setForm({...form,stockSeguranca:v})}/><Field label="Preço de aquisição (MT)" type="number" min="0" step="0.01" required value={form.precoAquisicao} onChange={(v) => setForm({...form,precoAquisicao:v})}/><Field label="Preço de venda (MT)" type="number" min="0" step="0.01" required value={form.precoVenda} onChange={(v) => setForm({...form,precoVenda:v})}/><Field label="Fornecedor" value={form.nomeFornecedor} onChange={(v) => setForm({...form,nomeFornecedor:v})}/><Field label="Contacto do fornecedor" value={form.contactoFornecedor} onChange={(v) => setForm({...form,contactoFornecedor:v})}/><Field label="Validade" value={form.validadeProduto} onChange={(v) => setForm({...form,validadeProduto:v})}/>
         <div className="flex items-end gap-3 sm:col-span-2"><button disabled={saving} type="submit" className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 py-3 font-semibold text-gray-950 disabled:opacity-50">{saving && <LoaderCircle size={17} className="animate-spin"/>}{editing ? 'Guardar alterações' : 'Registar produto'}</button><button type="button" onClick={() => setShowForm(false)} className="rounded-xl border border-gray-700 px-5 py-3">Cancelar</button></div></form></div></div>}
 
@@ -379,5 +366,5 @@ function Stat({ title, value, icon }: { title: string; value: string; icon: Reac
 }
 
 function Field({ label, value, onChange, type = 'text', required = false, min, step }: { label: string; value: string; onChange: (value: string) => void; type?: string; required?: boolean; min?: string; step?: string }) {
-  return <label className="block"><span className="mb-2 block text-sm text-gray-400">{label}</span><input type={type} min={min} step={step} required={required} value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-xl border border-gray-800 bg-gray-900 px-4 py-3 text-white outline-none focus:border-emerald-500"/></label>
+  return <label className="block min-w-0 w-full"><span className="mb-2 block text-sm text-gray-400">{label}</span><input type={type} min={min} step={step} required={required} value={value} onChange={(e) => onChange(e.target.value)} className="box-border block min-w-0 w-full max-w-full appearance-none rounded-xl border border-gray-800 bg-gray-900 px-3 sm:px-4 py-3 text-base text-white outline-none focus:border-emerald-500"/></label>
 }
