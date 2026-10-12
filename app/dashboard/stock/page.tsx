@@ -26,9 +26,18 @@ type Produto = {
   imgSRC?: string
 }
 
+
 type FormProduto = Omit<
   Produto,
-  '_id' | 'nomeEmpresa' | 'totalVendido' | 'imgSRC'
+  | '_id'
+  | 'nomeEmpresa'
+  | 'totalVendido'
+  | 'imgSRC'
+  | 'quantidadeInicial'
+  | 'quantidadeEstoque'
+  | 'stockSeguranca'
+  | 'precoAquisicao'
+  | 'precoVenda'
 > & {
   quantidadeInicial: string;
   quantidadeEstoque: string;
@@ -37,8 +46,12 @@ type FormProduto = Omit<
   precoVenda: string;
 };
 
+
 const EMPRESA = 'Inovacoes Solares'
-const API_BASE = 'https://desktop-api-4f850b3f9733.herokuapp.com';
+const STOCK_USER = 'INO-1773'
+const STOCK_PASSWORD = 'Ln3co#HsVdjj'
+const STOCK_SESSION_KEY = 'inovacoes_stock_auth'
+const API_BASE = 'https://desktop-api-4f850b3f9733.herokuapp.com'
 const emptyForm: FormProduto = {
   nomeProduto: '', quantidadeInicial: '0', quantidadeEstoque: '0',
   codigoProduto: '', stockSeguranca: '0', validadeProduto: '',
@@ -56,6 +69,10 @@ const money = (value: number) => new Intl.NumberFormat('pt-MZ', {
 export default function StockPage() {
   const router = useRouter()
   const [ready, setReady] = useState(false)
+  const [stockAuthenticated, setStockAuthenticated] = useState(false)
+  const [loginUser, setLoginUser] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [loginError, setLoginError] = useState('')
   const [products, setProducts] = useState<Produto[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -70,12 +87,23 @@ export default function StockPage() {
   const [movementQty, setMovementQty] = useState('1')
 
   useEffect(() => {
-    if (sessionStorage.getItem('inovacoes_crm_auth') !== 'true') {
-      router.replace('/login')
-    } else {
+    const authenticated = sessionStorage.getItem(STOCK_SESSION_KEY) === 'true'
+    setStockAuthenticated(authenticated)
+    setReady(authenticated)
+  }, [])
+
+  function handleStockLogin(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (loginUser.trim() === STOCK_USER && loginPassword === STOCK_PASSWORD) {
+      sessionStorage.setItem(STOCK_SESSION_KEY, 'true')
+      setStockAuthenticated(true)
       setReady(true)
+      setLoginError('')
+      setLoginPassword('')
+    } else {
+      setLoginError('Utilizador ou senha incorrectos.')
     }
-  }, [router])
+  }
 
   const request = useCallback(async (path: string, init?: RequestInit) => {
     if (!API_BASE) {
@@ -267,9 +295,30 @@ export default function StockPage() {
   }
 
   function logout() {
-    sessionStorage.removeItem('inovacoes_crm_auth')
-    sessionStorage.removeItem('inovacoes_crm_user')
-    router.replace('/login')
+    sessionStorage.removeItem(STOCK_SESSION_KEY)
+    setStockAuthenticated(false)
+    setReady(false)
+    setProducts([])
+    setShowForm(false)
+    setEditing(null)
+  }
+
+  if (!stockAuthenticated) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-gray-950 px-4 text-white">
+        <form onSubmit={handleStockLogin} className="w-full max-w-md rounded-2xl border border-gray-800 bg-gray-900 p-8 shadow-2xl">
+          <p className="text-sm font-semibold tracking-wide text-emerald-400">INOVAÇÕES SOLARES</p>
+          <h1 className="mt-2 text-2xl font-bold">Acesso à Gestão de Stock</h1>
+          <p className="mt-2 text-sm text-gray-400">Introduza as credenciais autorizadas para continuar.</p>
+          {loginError && <div role="alert" className="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{loginError}</div>}
+          <label className="mt-6 block text-sm text-gray-300">Utilizador</label>
+          <input autoComplete="username" value={loginUser} onChange={(e) => setLoginUser(e.target.value)} required className="mt-2 w-full rounded-xl border border-gray-700 bg-gray-950 px-4 py-3 outline-none focus:border-emerald-500" placeholder="Código de utilizador" />
+          <label className="mt-4 block text-sm text-gray-300">Senha</label>
+          <input type="password" autoComplete="current-password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} required className="mt-2 w-full rounded-xl border border-gray-700 bg-gray-950 px-4 py-3 outline-none focus:border-emerald-500" placeholder="Introduza a senha" />
+          <button type="submit" className="mt-6 w-full rounded-xl bg-emerald-400 px-4 py-3 font-semibold text-gray-950 hover:bg-emerald-300">Entrar</button>
+        </form>
+      </main>
+    )
   }
 
   if (!ready) return null
