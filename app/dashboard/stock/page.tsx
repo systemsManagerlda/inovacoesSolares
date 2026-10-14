@@ -919,28 +919,562 @@ export default function StockPage() {
     }
   }
 
-  function printArea(id: string) {
-    const el = document.getElementById(id);
-    if (!el) return;
+  
+  
+  async function printArea(id: string) {
+    const source = document.getElementById(id);
 
-    const w = window.open("", "_blank", "width=1000,height=800");
-    if (!w) {
-      setError(
-        "Permita janelas pop-up para imprimir ou guardar o documento em PDF.",
-      );
+    if (!source) {
+      setError("Não foi possível localizar o documento para exportação.");
       return;
     }
 
-    w.document.write(
-      `<!doctype html><html lang="pt"><head><meta charset="utf-8"><title>Inovações Solares - Documento de Stock</title><style>body{font-family:Arial,sans-serif;color:#111;padding:28px}h1,h2{margin-bottom:6px}.muted{color:#555;font-size:12px}table{border-collapse:collapse;width:100%;margin-top:18px}th,td{border:1px solid #aaa;padding:8px;text-align:left;font-size:12px}th{background:#eee}.signatures{display:flex;gap:40px;margin-top:70px}.signatures div{border-top:1px solid #555;flex:1;padding-top:8px;text-align:center}.no-print{display:none!important}</style></head><body>${el.innerHTML}</body></html>`,
-    );
-    w.document.close();
-    w.focus();
-    setTimeout(() => {
-      w.print();
-      w.close();
-    }, 350);
+    let container: HTMLDivElement | null = null;
+
+    setError("");
+    setNotice("");
+
+    try {
+      // html2canvas-pro suporta cores modernas como lab() e oklch().
+      const canvasModule = await import("html2canvas-pro");
+      const jsPdfModule = await import("jspdf");
+
+      const html2canvasPro = canvasModule.default;
+      const JsPDF = jsPdfModule.jsPDF;
+
+      const isStockMapPdf = id === "stock-print-area";
+      const isLandscape = [
+        "stock-print-area",
+        "extract-print-area",
+        "history-print-area",
+      ].includes(id);
+
+      const titles: Record<string, string> = {
+        "stock-print-area": "MAPA DE STOCK",
+        "extract-print-area": "EXTRACTO DE SAÍDAS",
+        "history-print-area": "HISTÓRICO DE MOVIMENTOS",
+        "document-print-area": "DOCUMENTO DE STOCK",
+      };
+
+      const title =
+        titles[id] ||
+        (id.startsWith("order-")
+          ? "ORDEM DE COMPRA"
+          : "DOCUMENTO DE STOCK");
+
+      const fileName =
+        title
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-zA-Z0-9]+/g, "-")
+          .replace(/^-|-$/g, "")
+          .toLowerCase() +
+        "-" +
+        new Date().toISOString().slice(0, 10) +
+        ".pdf";
+
+      container = document.createElement("div");
+
+      Object.assign(container.style, {
+        position: "fixed",
+        left: "-10000px",
+        top: "0",
+        width: isLandscape ? "1040px" : "720px",
+        padding: "24px",
+        background: "#ffffff",
+        color: "#172b3a",
+        fontFamily: "Arial, Helvetica, sans-serif",
+        fontSize: "10px",
+        boxSizing: "border-box",
+        zIndex: "99999",
+        display: "flex",
+        flexDirection: "column",
+        minHeight: isLandscape ? "735px" : "1018px",
+      });
+
+      const style = document.createElement("style");
+      style.textContent = `
+        * { box-sizing: border-box; }
+        .pdf-content {
+          position: relative;
+          z-index: 1;
+          width: 100%;
+          flex: 1 0 auto;
+          color: #172b3a;
+          background: transparent;
+          overflow: visible;
+        }
+        .pdf-content h1 {
+          color: #075985;
+          font-size: 18px;
+          margin: 0 0 8px;
+        }
+        .pdf-content h2 {
+          color: #075985;
+          font-size: 13px;
+          margin: 12px 0 8px;
+        }
+        .pdf-content p { margin: 5px 0; line-height: 1.45; }
+        .pdf-content table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 12px 0;
+          background: #ffffff;
+        }
+        .pdf-content thead { display: table-header-group; }
+        .pdf-content tr {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+        .pdf-content th {
+          background: #075985 !important;
+          color: #ffffff !important;
+          font-weight: bold;
+          text-align: left;
+          border: 1px solid #d0dce5;
+          padding: 7px 5px;
+          font-size: 9px;
+        }
+        .pdf-content td {
+          color: #172b3a;
+          border: 1px solid #d0dce5;
+          padding: 6px 5px;
+          font-size: 9px;
+          overflow-wrap: anywhere;
+          vertical-align: top;
+        }
+        .pdf-content tbody tr:nth-child(even) {
+          background: #f0f7fb;
+        }
+        /* Estilos exclusivos do mapa de stock: mantêm os outros PDFs inalterados. */
+        .pdf-stock-map > div:first-child {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 0 0 8px;
+          margin-bottom: 8px;
+          border-bottom: 1px solid #d0dce5;
+        }
+        .pdf-stock-map > div:first-child h2 {
+          margin: 0 0 4px;
+          color: #075985;
+          font-size: 15px;
+        }
+        .pdf-stock-map > div:first-child p {
+          margin: 2px 0;
+          color: #526575;
+          font-size: 8px;
+        }
+        .pdf-stock-map table {
+          width: 100% !important;
+          min-width: 0 !important;
+          table-layout: fixed;
+          margin: 7px 0 0;
+          border-collapse: collapse;
+        }
+        .pdf-stock-map th {
+          padding: 6px 4px;
+          font-size: 8px;
+          line-height: 1.2;
+          text-transform: uppercase;
+          letter-spacing: .2px;
+        }
+        .pdf-stock-map td {
+          padding: 5px 4px;
+          font-size: 8px;
+          line-height: 1.25;
+          overflow-wrap: anywhere;
+          word-break: break-word;
+        }
+        .pdf-stock-map td p { margin: 1px 0; }
+        .pdf-stock-map td p.mt-1 { margin-top: 2px; font-size: 7px; }
+        .pdf-stock-map .pdf-stock-summary {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 8px;
+          margin: 8px 0 10px;
+        }
+        .pdf-stock-map .pdf-stock-summary > div {
+          border: 1px solid #d0dce5;
+          border-left: 3px solid #075985;
+          border-radius: 4px;
+          padding: 7px 8px;
+          background: #f5f9fc;
+        }
+        .pdf-stock-map .pdf-stock-summary span {
+          display: block;
+          color: #526575;
+          font-size: 7px;
+          margin-bottom: 3px;
+        }
+        .pdf-stock-map .pdf-stock-summary strong {
+          display: block;
+          color: #075985;
+          font-size: 10px;
+        }
+        .pdf-stock-map tbody tr:nth-child(even) { background: #f0f7fb; }
+        .pdf-stock-map tbody tr { break-inside: avoid; page-break-inside: avoid; }
+        .pdf-extract-summary {
+          display: flex;
+          justify-content: space-between;
+          gap: 16px;
+          flex-wrap: wrap;
+          margin: 0 0 10px;
+          padding: 9px 12px;
+          border-left: 4px solid #ffcc00;
+          background: #f0f7fb;
+          color: #334b5c;
+          font-size: 10px;
+        }
+        .pdf-extract-summary p { margin: 2px 0; }
+        .pdf-empty {
+          margin-top: 12px;
+          padding: 16px;
+          text-align: center;
+          border: 1px dashed #b8c8d4;
+          color: #526575;
+        }
+        .pdf-header {
+          position: relative;
+          z-index: 2;
+          flex: 0 0 auto;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 5px;
+          padding-bottom: 12px;
+          margin-bottom: 18px;
+          border-bottom: 3px solid #ffcc00;
+          background: #ffffff;
+          text-align: center;
+        }
+        .pdf-header img {
+          display: block;
+          width: 112px;
+          height: 76px;
+          max-height: 76px;
+          object-fit: contain;
+          margin: 0 auto;
+        }
+        .pdf-company { width: 100%; text-align: center; }
+        .pdf-company h1 {
+          color: #075985;
+          font-size: 17px;
+          margin: 0 0 5px;
+        }
+        .pdf-company p { margin: 3px 0; font-size: 9px; line-height: 1.35; color: #334b5c; }
+        .pdf-company .pdf-company-details { margin-top: 3px; font-size: 9px; line-height: 1.4; }
+        .pdf-company .pdf-company-details p { margin: 2px 0; }
+        .pdf-company .pdf-document-title { margin-top: 6px; font-size: 10px; color: #243746; }
+        .pdf-date {
+          position: absolute;
+          right: 0;
+          top: 4px;
+          min-width: 85px;
+          text-align: right;
+          color: #526575;
+          font-size: 9px;
+        }
+        .pdf-watermark {
+          position: absolute;
+          z-index: 0;
+          top: 52%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 360px;
+          height: 300px;
+          max-width: 70%;
+          margin: 0;
+          object-fit: contain;
+          opacity: 0.065;
+          pointer-events: none;
+        }
+        .pdf-footer {
+          position: relative;
+          z-index: 2;
+          flex: 0 0 auto;
+          border-top: 1px solid #d0dce5;
+          padding-top: 9px;
+          margin-top: auto;
+          color: #526575;
+          text-align: center;
+          font-size: 8px;
+        }
+        .pdf-signatures, .signatures {
+          display: flex;
+          gap: 24px;
+          margin-top: 45px;
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+        .pdf-signatures > div, .signatures > div {
+          flex: 1;
+          border-top: 1px solid #64748b;
+          padding-top: 8px;
+          text-align: center;
+        }
+        .pdf-content .hidden,
+        .pdf-content .no-print,
+        .pdf-content button,
+        .pdf-content input,
+        .pdf-content select {
+          display: none !important;
+        }
+      `;
+
+      const header = document.createElement("div");
+      header.className = "pdf-header";
+
+      const logo = document.createElement("img");
+      logo.src = "/inovacoes-solares-logo.png";
+      logo.alt = "Logótipo Inovações Solares";
+
+      const company = document.createElement("div");
+      company.className = "pdf-company";
+
+      const companyName = document.createElement("h1");
+      companyName.textContent = "INOVAÇÕES SOLARES, LDA";
+
+      const companyDetails = document.createElement("div");
+      companyDetails.className = "pdf-company-details";
+      companyDetails.innerHTML = `
+        <p>Av. do Trabalho, Bairro da Malanga, Nr. 1235, R/C</p>
+        <p>NUIT: 401143025</p>
+        <p>Email: inovacoessolares@gmail.com</p>
+        <p>Telefone: (+258) 84 113 8173 | (+258) 87 113 8173</p>
+      `;
+
+      const documentTitle = document.createElement("p");
+      documentTitle.textContent = title;
+      documentTitle.style.fontWeight = "bold";
+      documentTitle.className = "pdf-document-title";
+      company.append(companyName, companyDetails, documentTitle);
+
+      const date = document.createElement("div");
+      date.className = "pdf-date";
+      date.textContent =
+        "Emitido em " + new Date().toLocaleDateString("pt-MZ");
+
+      header.append(logo, company, date);
+
+      const watermark = document.createElement("img");
+      watermark.src = "/inovacoes-solares-logo.png";
+      watermark.alt = "";
+      watermark.className = "pdf-watermark";
+
+      const content = document.createElement("div");
+      content.className = isStockMapPdf
+        ? "pdf-content pdf-stock-map"
+        : "pdf-content";
+      content.innerHTML = source.innerHTML;
+
+      // O mapa de stock deve apresentar todos os produtos filtrados, não apenas a página visível.
+      if (isStockMapPdf) {
+        const table = content.querySelector("table");
+        const existingHead = table?.querySelector("thead");
+        if (table && existingHead) {
+          const body = document.createElement("tbody");
+          filtered.forEach((product) => {
+            const quantity = numberOf(product.quantidadeEstoque);
+            const safety = numberOf(product.stockSeguranca);
+            const status = quantity <= 0
+              ? "Esgotado"
+              : quantity <= safety
+                ? "Stock baixo"
+                : "Disponível";
+            const values = [
+              `${product.nomeProduto || "—"}\n${product.nomeFornecedor || "Fornecedor não indicado"}`,
+              product.codigoProduto || "—",
+              product.categoriaNovo || "Geral",
+              String(quantity),
+              String(safety),
+              money(numberOf(product.precoAquisicao)),
+              money(quantity * numberOf(product.precoAquisicao)),
+              status,
+            ];
+            const row = document.createElement("tr");
+            values.forEach((value, index) => {
+              const cell = document.createElement("td");
+              cell.textContent = value;
+              if (index === 3 || index === 4) cell.style.textAlign = "center";
+              if (index === 7) {
+                cell.style.fontWeight = "bold";
+                cell.style.color = quantity <= 0 ? "#b91c1c" : quantity <= safety ? "#b45309" : "#047857";
+              }
+              row.appendChild(cell);
+            });
+            body.appendChild(row);
+          });
+          table.querySelector("tbody")?.replaceWith(body);
+          table.style.width = "100%";
+          table.style.minWidth = "0";
+        }
+      }
+
+      // O extracto deve incluir todos os movimentos filtrados, não apenas a página visível.
+      if (id === "extract-print-area") {
+        const table = content.querySelector("table");
+        const existingHead = table?.querySelector("thead");
+        if (table && existingHead) {
+          const summaryBlock = document.createElement("div");
+          summaryBlock.className = "pdf-extract-summary";
+
+          const period = document.createElement("p");
+          period.textContent = `Período: ${filterFrom ? new Date(`${filterFrom}T00:00:00`).toLocaleDateString("pt-MZ") : "Desde o início"} até ${filterTo ? new Date(`${filterTo}T00:00:00`).toLocaleDateString("pt-MZ") : "à data de emissão"}`;
+
+          const totals = document.createElement("p");
+          const totalUnits = exits.reduce((sum, movement) => sum + numberOf(movement.quantidade), 0);
+          totals.textContent = `Registos: ${exits.length} saída(s)  |  Quantidade total movimentada: ${totalUnits}`;
+
+          summaryBlock.append(period, totals);
+          content.prepend(summaryBlock);
+
+          const body = document.createElement("tbody");
+          exits.forEach((movement) => {
+            const row = document.createElement("tr");
+            const values = [
+              dateTime(movement.createdAt),
+              movement.nomeProduto || "—",
+              movement.codigoProduto || "—",
+              String(movement.quantidade ?? 0),
+              [movement.clienteNome || "—", movement.clienteContacto || ""].filter(Boolean).join(" | "),
+              movement.tecnicoResponsavel || "—",
+              movement.destino || "—",
+              movement.gestorStock || "—",
+            ];
+            values.forEach((value) => {
+              const cell = document.createElement("td");
+              cell.textContent = value;
+              row.appendChild(cell);
+            });
+            body.appendChild(row);
+          });
+          table.querySelector("tbody")?.replaceWith(body);
+
+          if (exits.length === 0) {
+            const empty = document.createElement("p");
+            empty.textContent = "Sem saídas registadas para o período seleccionado.";
+            empty.className = "pdf-empty";
+            table.after(empty);
+          }
+        }
+      }
+
+      // Remove botões e controlos da interface do documento exportado.
+      content.querySelectorAll(
+        "button, input, select, textarea, .no-print",
+      ).forEach((element) => element.remove());
+
+      content.querySelectorAll(".hidden").forEach((element) => {
+        element.classList.remove("hidden");
+      });
+
+      content.querySelectorAll<HTMLElement>(".overflow-x-auto").forEach((el) => {
+        el.style.overflow = "visible";
+        el.style.width = "100%";
+      });
+
+      const footer = document.createElement("div");
+      footer.className = "pdf-footer";
+      footer.textContent =
+        "Inovações Solares, Lda — Documento gerado pelo sistema de Gestão de Stock.";
+
+      container.append(style, header, watermark, content, footer);
+      document.body.appendChild(container);
+
+      // Aguarda pelo carregamento do logótipo.
+      await Promise.all(
+        [logo, watermark].map(
+          (img) =>
+            new Promise<void>((resolve) => {
+              if (img.complete && img.naturalWidth > 0) {
+                resolve();
+                return;
+              }
+
+              img.onload = () => resolve();
+              img.onerror = () => resolve();
+            }),
+        ),
+      );
+
+      // Dá tempo ao navegador para aplicar os estilos antes da captura.
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve()),
+      );
+
+      const canvas = await html2canvasPro(container, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+        windowWidth: Math.max(
+          document.documentElement.clientWidth,
+          container.scrollWidth,
+        ),
+        onclone: (clonedDocument: Document) => {
+          clonedDocument.documentElement.style.backgroundColor = "#ffffff";
+          clonedDocument.body.style.backgroundColor = "#ffffff";
+        },
+      });
+
+      const pdf = new JsPDF({
+        orientation: isLandscape ? "landscape" : "portrait",
+        unit: "mm",
+        format: "a4",
+        compress: true,
+      });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 8;
+      const usableWidth = pageWidth - margin * 2;
+      const usableHeight = pageHeight - margin * 2 - 5;
+
+      const imageData = canvas.toDataURL("image/jpeg", 0.96);
+      const imageHeight = (canvas.height * usableWidth) / canvas.width;
+      const totalPages = Math.max(1, Math.ceil(imageHeight / usableHeight));
+
+      for (let page = 0; page < totalPages; page++) {
+        if (page > 0) pdf.addPage();
+
+        // A imagem é posicionada de modo a dividir o conteúdo pelas páginas.
+        pdf.addImage(
+          imageData,
+          "JPEG",
+          margin,
+          margin - page * usableHeight,
+          usableWidth,
+          imageHeight,
+          undefined,
+          "FAST",
+        );
+
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(8);
+        pdf.setTextColor(82, 101, 117);
+        pdf.text(
+          `Página ${page + 1} de ${totalPages}`,
+          pageWidth - margin,
+          pageHeight - 4,
+          { align: "right" },
+        );
+      }
+
+      pdf.save(fileName);
+      setNotice("PDF exportado com sucesso.");
+    } catch (error) {
+      console.error("Erro ao exportar PDF:", error);
+      setError(
+        "Não foi possível gerar o PDF. Confirme se o logótipo existe em public/inovacoes-solares-logo.png e consulte a consola do navegador.",
+      );
+    } finally {
+      container?.remove();
+    }
   }
+
 
   function logout() {
     sessionStorage.removeItem(STOCK_SESSION_KEY);
@@ -1086,7 +1620,7 @@ export default function StockPage() {
           <ActionCard
             icon={<Printer size={21} />}
             title="Mapa de stock em PDF"
-            text="Imprimir ou guardar o mapa actual como PDF."
+            text="Guardar o mapa actual como PDF."
             onClick={() => printArea("stock-print-area")}
           />
           <ActionCard
@@ -1156,7 +1690,7 @@ export default function StockPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-800 px-5 py-4">
             <div>
               <h2 className="font-semibold">
-                Mapa de Stock — Inovações Solares
+                Mapa de Stock
               </h2>
               <p className="text-xs text-gray-500">
                 Gerado em {new Date().toLocaleString("pt-MZ")}
@@ -1166,7 +1700,7 @@ export default function StockPage() {
               onClick={() => printArea("stock-print-area")}
               className="flex items-center gap-2 rounded-lg border border-gray-700 px-3 py-2 text-sm"
             >
-              <Printer size={16} /> Imprimir / PDF
+              <Printer size={16} /> Exportar PDF
             </button>
           </div>
           {loading ? (
@@ -1357,7 +1891,7 @@ export default function StockPage() {
           </div>
           <div id="extract-print-area" className="overflow-x-auto px-4 pb-4">
             <h2 className="hidden print:block">
-              Inovações Solares — Extracto de Saídas
+              {/* Inovações Solares — Extracto de Saídas */}
             </h2>
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead className="text-xs uppercase text-gray-500">
@@ -1556,10 +2090,10 @@ export default function StockPage() {
                         onClick={() => printArea(`order-${o._id}`)}
                         className="text-emerald-300 underline"
                       >
-                        Imprimir
+                        PDF
                       </button>
                       <div id={`order-${o._id}`} className="hidden">
-                        <h1>INOVAÇÕES SOLARES — ORDEM DE COMPRA</h1>
+                        {/* <h1>INOVAÇÕES SOLARES — ORDEM DE COMPRA</h1> */}
                         <p>N.º: {o.numero}</p>
                         <p>
                           Fornecedor: {o.fornecedor} — {o.contactoFornecedor}
@@ -2195,7 +2729,7 @@ export default function StockPage() {
             id="document-print-area"
             className="rounded-xl bg-white p-6 text-gray-950"
           >
-            <h1 className="text-xl font-bold">INOVAÇÕES SOLARES</h1>
+            {/* <h1 className="text-xl font-bold">INOVAÇÕES SOLARES</h1> */}
             <p className="text-sm">
               {docKind === "guia-transporte"
                 ? "GUIA DE TRANSPORTE"
@@ -2273,7 +2807,7 @@ export default function StockPage() {
             onClick={() => printArea("document-print-area")}
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 font-semibold text-gray-950"
           >
-            <Printer size={17} /> Imprimir / Guardar como PDF
+            <Printer size={17} /> Exportar PDF
           </button>
         </Modal>
       )}
